@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Camerino beta</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Cutive+Mono&display=swap">
+<style>
+/* Layout: app a schermo intero sul telefono, colonna di 430px al centro sul computer. Solo tema chiaro, per scelta (come il mockup approvato). */
+:root {
+  --paper: #ffffff;
+  --desk: #f1f1ee;
+  --ink: #111111;
+  --ink-2: #55554f;
+  --ink-3: #9a9a93;
+  --rule: #e6e6e1;
+  --warn: #9c4a1a;
+  --good: #2f5a3a;
+  --type: "Courier Prime", "Courier New", Courier, ui-monospace, monospace;
+  --display: "Cutive Mono", "Courier Prime", "Courier New", monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--desk); color: var(--ink);
+  font-family: var(--type); font-size: 15px; line-height: 1.45;
+}
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+.app {
+  position: relative; height: 100%; max-width: 430px; margin: 0 auto; background: var(--paper);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.screen { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.pad { padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+
+/* ---------- onboarding ---------- */
+.ob { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; padding-block: 20px 0; }
+.step { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); display: flex; justify-content: space-between; }
+.ob h2 { font-family: var(--display); font-weight: 400; font-size: 31px; line-height: 1.08; margin: 14px 0 8px; text-wrap: balance; }
+.lede { margin: 0 0 18px; color: var(--ink-2); font-size: 14px; }
+.field { display: grid; gap: 10px; padding: 16px 0; border-top: 1px solid var(--rule); }
+.field:last-of-type { border-bottom: 1px solid var(--rule); }
+.lab { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); display: flex; justify-content: space-between; }
+.lab output { color: var(--ink); font-weight: 700; letter-spacing: 0; text-transform: none; font-size: 15px; }
+input[type=range] { width: 100%; accent-color: var(--ink); }
+.sizes { display: flex; gap: 6px; flex-wrap: wrap; }
+.sizes button { width: 48px; height: 40px; border: 1px solid var(--rule); }
+.sizes button[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.seasons { display: grid; gap: 8px; }
+.season { display: grid; grid-template-columns: 104px 1fr; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid var(--rule); text-align: left; }
+.season b { font-size: 14px; }
+.season small { display: block; font-size: 11px; color: var(--ink-2); }
+.season[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.swatches { display: flex; gap: 4px; justify-content: flex-end; flex-wrap: wrap; }
+.swatches i { width: 20px; height: 20px; border-radius: 50%; border: 1px solid rgba(0,0,0,.12); }
+.cta {
+  flex: none; height: 54px; background: var(--ink); color: var(--paper); width: 100%;
+  display: flex; align-items: center; justify-content: space-between; padding: 0 20px; font-size: 15px; letter-spacing: .04em;
+}
+.cta[disabled] { background: var(--rule); color: var(--ink-3); cursor: not-allowed; }
+.ob-foot { position: sticky; bottom: 0; background: var(--paper); padding-block: 16px max(16px, env(safe-area-inset-bottom, 0px)); margin-top: auto; }
+
+/* ---------- camerino ---------- */
+.top { flex: none; display: flex; align-items: center; justify-content: space-between; padding-block: 12px 8px; }
+.logo { font-family: var(--display); font-size: 24px; }
+.logo sup { font-family: var(--type); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin-left: 4px; }
+.icon { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid var(--rule); }
+.icon:hover { border-color: var(--ink); }
+.icon svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+
+.stage { position: relative; flex: 1; min-height: 260px; touch-action: pan-y; user-select: none; cursor: grab; }
+.stage:active { cursor: grabbing; }
+.stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; transition: opacity .35s ease; pointer-events: none; }
+.stage img.out { opacity: 0; }
+.stage img.flip { transform: scaleX(-1); }
+.measure { position: absolute; left: 0; top: 4px; font-size: 11px; color: var(--ink-2); line-height: 1.5; z-index: 2; }
+.measure b { color: var(--ink); }
+.pal { display: flex; gap: 3px; margin-top: 4px; }
+.pal i { width: 11px; height: 11px; border-radius: 50%; border: 1px solid rgba(0,0,0,.12); }
+.viewer { position: absolute; left: 0; right: 0; bottom: 6px; display: flex; align-items: center; justify-content: center; gap: 10px; z-index: 2; }
+.viewer button { width: 34px; height: 34px; border: 1px solid var(--ink); background: var(--paper); font-size: 16px; }
+.viewer span { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; min-width: 92px; text-align: center; background: var(--paper); }
+.ticks { display: flex; gap: 4px; justify-content: center; margin-top: 3px; }
+.ticks i { width: 6px; height: 6px; border: 1px solid var(--ink); border-radius: 50%; }
+.ticks i.on { background: var(--ink); }
+.note { position: absolute; right: 0; top: 4px; font-size: 11px; color: var(--ink-3); text-align: right; max-width: 120px; z-index: 2; }
+
+.piece { flex: none; border-top: 1px solid var(--ink); padding-block: 12px; display: grid; gap: 10px; }
+.piece-row { display: grid; grid-template-columns: 58px 1fr; gap: 12px; align-items: center; }
+.thumb { width: 58px; height: 70px; object-fit: contain; border: 1px solid var(--rule); background: #f6f6f4; }
+.p-meta { min-width: 0; display: grid; gap: 1px; }
+.p-cat { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.p-name { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.p-sub { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.tone { display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 1px solid rgba(0,0,0,.18); margin-right: 3px; }
+.good { color: var(--good); } .warn { color: var(--warn); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.ghost { height: 44px; border: 1px solid var(--ink); font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; }
+.ghost.dark { background: var(--ink); color: var(--paper); }
+.foot { flex: none; font-size: 11px; color: var(--ink-3); padding-block: 0 max(12px, env(safe-area-inset-bottom, 0px)); }
+
+/* ---------- catalogo ---------- */
+.sheet { position: absolute; inset: 0; background: var(--paper); z-index: 20; display: flex; flex-direction: column; transform: translateY(100%); transition: transform .3s ease; }
+.sheet.open { transform: none; }
+.sheet-top { flex: none; display: flex; align-items: center; justify-content: space-between; padding-block: 14px 10px; }
+.sheet-top h3 { font-family: var(--display); font-weight: 400; font-size: 24px; margin: 0; }
+.chips { flex: none; display: flex; gap: 6px; flex-wrap: wrap; padding-bottom: 8px; }
+.chip { height: 32px; padding: 0 10px; border: 1px solid var(--rule); font-size: 12px; }
+.chip[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.count { flex: none; font-size: 12px; color: var(--ink-2); padding-bottom: 8px; }
+.grid { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 14px 10px; align-content: start; padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
+.card { text-align: left; display: grid; gap: 4px; }
+.card img { width: 100%; aspect-ratio: 3 / 4; object-fit: contain; background: #f6f6f4; border: 1px solid var(--rule); }
+.card[aria-current="true"] img { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.card b { font-size: 13px; line-height: 1.25; }
+.card small { font-size: 11px; color: var(--ink-2); }
+.card .why { color: var(--warn); }
+
+.toast { position: absolute; left: 16px; right: 16px; bottom: 120px; background: var(--ink); color: var(--paper); z-index: 30; padding: 11px 14px; font-size: 13px; opacity: 0; transform: translateY(8px); transition: opacity .25s, transform .25s; pointer-events: none; }
+.toast.show { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <!-- 1. misure -->
+  <section class="screen" id="s-misure" hidden>
+    <div class="ob pad">
+      <div class="step"><span>Camerino · beta</span><span>1 / 2</span></div>
+      <h2>Le tue misure</h2>
+      <p class="lede">Servono per dirti se la tua taglia c'è. Restano solo su questo telefono.</p>
+      <div class="field">
+        <div class="lab"><span>Altezza</span><output id="o-alt">168 cm</output></div>
+        <input type="range" id="altezza" min="150" max="195" value="168" aria-label="Altezza in centimetri">
+      </div>
+      <div class="field">
+        <div class="lab"><span>Taglia abituale</span></div>
+        <div class="sizes" id="taglie"></div>
+      </div>
+      <div class="field">
+        <div class="lab"><span>Budget per capo</span><output id="o-bud">$ 450</output></div>
+        <input type="range" id="budget" min="150" max="700" step="10" value="450" aria-label="Budget massimo per capo in dollari">
+      </div>
+      <div class="ob-foot"><button class="cta" id="go-palette"><span>Avanti</span><span>→</span></button></div>
+    </div>
+  </section>
+
+  <!-- 2. palette -->
+  <section class="screen" id="s-palette" hidden>
+    <div class="ob pad">
+      <div class="step"><span>Camerino · beta</span><span>2 / 2</span></div>
+      <h2>La tua palette</h2>
+      <p class="lede">Ogni capo viene confrontato con questi colori, misurando il colore vero dalla foto del negozio.</p>
+      <div class="seasons" id="stagioni"></div>
+      <div class="ob-foot"><button class="cta" id="go-camerino" disabled><span>Entra nel camerino</span><span>→</span></button></div>
+    </div>
+  </section>
+
+  <!-- 3. camerino -->
+  <section class="screen" id="s-camerino" hidden>
+    <header class="top pad">
+      <span class="logo">Camerino<sup>beta</sup></span>
+      <span style="display:flex;gap:6px">
+        <button class="icon" id="apri-catalogo" aria-label="Cambia capo"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></button>
+        <button class="icon" id="profilo" aria-label="Modifica misure e palette"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></button>
+      </span>
+    </header>
+
+    <div class="stage pad" id="stage" aria-label="Avatar: trascina a destra o a sinistra per girarlo">
+      <div style="position:relative;height:100%">
+        <img id="img-a" alt="">
+        <img id="img-b" class="out" alt="">
+        <div class="measure" id="misure"></div>
+        <div class="note" id="nota"></div>
+        <div class="viewer">
+          <button id="gira-sx" aria-label="Gira a sinistra">‹</button>
+          <div><span id="vista">Fronte</span><div class="ticks" id="ticks"></div></div>
+          <button id="gira-dx" aria-label="Gira a destra">›</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="piece pad" id="capo"></div>
+    <p class="foot pad">Pantaloni e scarpe sono quelli dell'avatar: nella beta si prova solo il capo di sopra. L'anteprima mostra l'aspetto, non verifica la vestibilità.</p>
+
+    <div class="sheet" id="catalogo" aria-hidden="true">
+      <div class="sheet-top pad"><h3>Catalogo</h3><button class="icon" id="chiudi" aria-label="Chiudi catalogo">✕</button></div>
+      <div class="chips pad" id="filtri"></div>
+      <div class="count pad" id="conteggio"></div>
+      <div class="grid pad" id="griglia"></div>
+    </div>
+  </section>
+
+  <div class="toast" id="toast" role="status"></div>
+</div>
+
+<script>
+const NEGOZIO = { nome: "The Frankie Shop", url: "https://thefrankieshop.com/products/" };
+// Capi veri del negozio, letti dal sito il 26/10/2026. "hex" è il colore dominante misurato sulla foto prodotto.
+const CATALOGO = [{"id": "skye-padded-trench-coat-bottle-green", "nome": "Skye Padded Trench Coat", "colore": "Verde bottiglia", "prezzo": 540, "taglie": ["XXS", "XS", "S", "M", "L", "XL"], "tipo": "capospalla", "hex": "#17282a"}, {"id": "hudson-faux-leather-bomber-jacket-black", "nome": "Hudson Faux Leather Bomber", "colore": "Nero", "prezzo": 490, "taglie": ["XXS", "XS", "S", "M", "L", "XL"], "tipo": "capospalla", "hex": "#1e1f23"}, {"id": "zion-bomber-jacket-red", "nome": "Zion Bomber Jacket", "colore": "Rosso", "prezzo": 388, "taglie": ["ONE SIZE"], "tipo": "capospalla", "hex": "#a03445"}, {"id": "jane-long-coat-white", "nome": "Jane Long Coat", "colore": "Avorio", "prezzo": 550, "taglie": ["XXS", "XS", "S", "M", "L", "XL"], "tipo": "capospalla", "hex": "#e6e5e2"}, {"id": "aubin-herringbone-belted-jacket-black-melange", "nome": "Aubin Herringbone Belted Jacket", "colore": "Nero mélange", "prezzo": 385, "taglie": ["S", "M", "L"], "tipo": "capospalla", "hex": "#666467"}, {"id": "mila-collarless-trench-coat-charcoal", "nome": "Mila Collarless Trench Coat", "colore": "Antracite", "prezzo": 395, "taglie": ["XS", "S", "M", "L"], "tipo": "capospalla", "hex": "#514e57"}, {"id": "mael-padded-cardigan-brown", "nome": "Mael Padded Cardigan", "colore": "Marrone", "prezzo": 285, "taglie": ["XXS", "XS", "S", "M", "L", "XL"], "tipo": "maglia", "hex": "#352b29"}, {"id": "eve-thin-turtleneck-sweater-burgundy", "nome": "Eve Thin Turtleneck", "colore": "Bordeaux", "prezzo": 215, "taglie": ["XXS", "XS", "S", "M", "L", "XL"], "tipo": "maglia", "hex": "#461e25"}, {"id": "eve-thin-turtleneck-sweater-pale-yellow", "nome": "Eve Thin Turtleneck", "colore": "Giallo pallido", "prezzo": 215, "taglie": ["XXS", "XS", "S", "M", "L", "XL"], "tipo": "maglia", "hex": "#ede6d0"}, {"id": "croydon-padded-knit-polo-black", "nome": "Croydon Padded Knit Polo", "colore": "Nero", "prezzo": 180, "taglie": ["XXS", "XS", "S", "M", "L", "XL"], "tipo": "maglia", "hex": "#272228"}, {"id": "lupa-fuzzy-zip-up-cardigan-navy", "nome": "Lupa Fuzzy Zip-Up Cardigan", "colore": "Blu navy", "prezzo": 590, "taglie": ["XXS", "XS", "S", "M", "L", "XL"], "tipo": "maglia", "hex": "#131623"}];
+
+const STAGIONI = {
+  primavera: { nome: "Primavera", desc: "calda e chiara", colori: ["#f88379","#ffcba4","#f4d35e","#8db600","#fffff0","#c19a6b","#40b5ad"] },
+  estate:    { nome: "Estate",    desc: "fredda e chiara", colori: ["#e8b4b8","#b4a7d6","#a3c1d9","#c0c0c8","#b784a7","#5b7db1","#f5f5f0"] },
+  autunno:   { nome: "Autunno",   desc: "calda e profonda", colori: ["#b7410e","#d4a017","#708238","#c19a6b","#5d3a1a","#2e4a3a","#7b2d26","#efe6d2"] },
+  inverno:   { nome: "Inverno",   desc: "fredda e intensa", colori: ["#111111","#fafafa","#1b1f3b","#c8102e","#046307","#c71585","#3a3a40"] },
+};
+const TAGLIE = ["XXS","XS","S","M","L","XL"];
+// Viste dell'avatar. La quarta è il profilo specchiato: stessa immagine, girata.
+const VISTE = [
+  { id: "front", nome: "Fronte" },
+  { id: "side",  nome: "Profilo" },
+  { id: "back",  nome: "Spalle" },
+  { id: "side",  nome: "Profilo", flip: true },
+];
+
+const $ = id => document.getElementById(id);
+const stato = load() || { altezza: 168, taglia: null, budget: 450, stagione: null, capo: CATALOGO[0].id, filtri: { budget: true, palette: false } };
+let vista = 0;
+
+function load() { try { return JSON.parse(localStorage.getItem("camerino-beta")); } catch { return null; } }
+function save() { try { localStorage.setItem("camerino-beta", JSON.stringify(stato)); } catch {} }
+function show(id) { for (const s of document.querySelectorAll(".screen")) s.hidden = s.id !== id; }
+function toast(t) { const el = $("toast"); el.textContent = t; el.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("show"), 2200); }
+
+// ---- colore: distanza percettiva (CIE76 in Lab) tra il capo e la palette ----
+function lab(hex) {
+  const n = parseInt(hex.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255].map(v => { v /= 255; return v > .04045 ? ((v + .055) / 1.055) ** 2.4 : v / 12.92; });
+  let x = (c[0]*.4124 + c[1]*.3576 + c[2]*.1805) / .95047, y = c[0]*.2126 + c[1]*.7152 + c[2]*.0722, z = (c[0]*.0193 + c[1]*.1192 + c[2]*.9505) / 1.08883;
+  [x, y, z] = [x, y, z].map(v => v > .008856 ? Math.cbrt(v) : 7.787 * v + 16 / 116);
+  return [116*y - 16, 500*(x - y), 200*(y - z)];
+}
+function verdetto(capo) {
+  if (!stato.stagione) return null;
+  const a = lab(capo.hex);
+  const d = Math.min(...STAGIONI[stato.stagione].colori.map(h => { const b = lab(h); return Math.hypot(a[0]-b[0], a[1]-b[1], a[2]-b[2]); }));
+  if (d < 18) return { ok: 2, testo: "in palette" };
+  if (d < 30) return { ok: 1, testo: "vicino alla palette" };
+  return { ok: 0, testo: "fuori palette" };
+}
+function taglia(capo) {
+  if (capo.taglie.includes("ONE SIZE")) return { ok: true, testo: "taglia unica" };
+  if (!stato.taglia) return { ok: true, testo: capo.taglie.join(" · ") };
+  return capo.taglie.includes(stato.taglia)
+    ? { ok: true, testo: `${stato.taglia} in catalogo` }
+    : { ok: false, testo: `${stato.taglia} non prodotta (${capo.taglie[0]}–${capo.taglie.at(-1)})` };
+}
+
+// ---- onboarding ----
+function initMisure() {
+  $("altezza").value = stato.altezza; $("budget").value = stato.budget;
+  const upd = () => { $("o-alt").textContent = $("altezza").value + " cm"; $("o-bud").textContent = "$ " + $("budget").value; };
+  $("altezza").oninput = () => { stato.altezza = +$("altezza").value; upd(); };
+  $("budget").oninput = () => { stato.budget = +$("budget").value; upd(); };
+  upd();
+  $("taglie").innerHTML = TAGLIE.map(t => `<button aria-pressed="${stato.taglia === t}" data-t="${t}">${t}</button>`).join("");
+  $("taglie").onclick = e => { const b = e.target.closest("button"); if (!b) return; stato.taglia = b.dataset.t; for (const x of $("taglie").children) x.setAttribute("aria-pressed", x === b); };
+  $("go-palette").disabled = !stato.taglia;
+  $("taglie").addEventListener("click", () => { $("go-palette").disabled = !stato.taglia; });
+  $("go-palette").onclick = () => { save(); show("s-palette"); };
+}
+function initPalette() {
+  $("stagioni").innerHTML = Object.entries(STAGIONI).map(([k, s]) =>
+    `<button class="season" data-k="${k}" aria-pressed="${stato.stagione === k}"><span><b>${s.nome}</b><small>${s.desc}</small></span><span class="swatches">${s.colori.map(c => `<i style="background:${c}"></i>`).join("")}</span></button>`).join("");
+  $("go-camerino").disabled = !stato.stagione;
+  $("stagioni").onclick = e => { const b = e.target.closest("button"); if (!b) return; stato.stagione = b.dataset.k; for (const x of $("stagioni").children) x.setAttribute("aria-pressed", x === b); $("go-camerino").disabled = false; };
+  $("go-camerino").onclick = () => { save(); show("s-camerino"); render(); };
+}
+
+// ---- camerino ----
+let attiva = "img-a";
+function src(capoId, v) { return `img/prova/${capoId}__${v}.jpg`; }
+function mostra() {
+  const v = VISTE[vista], capo = CATALOGO.find(c => c.id === stato.capo);
+  const next = attiva === "img-a" ? "img-b" : "img-a", el = $(next), old = $(attiva);
+  const pronta = () => { el.classList.toggle("flip", !!v.flip); el.classList.remove("out"); old.classList.add("out"); attiva = next; };
+  el.onload = () => { $("nota").textContent = ""; pronta(); };
+  el.onerror = () => { el.onerror = null; el.onload = pronta; $("nota").textContent = "Questa vista del capo non è ancora pronta: vedi l'avatar senza."; el.src = `img/avatar_${v.id}.jpg`; };
+  el.alt = `Avatar con ${capo.nome}, vista ${v.nome.toLowerCase()}`;
+  el.src = src(capo.id, v.id);
+  $("vista").textContent = v.nome;
+  $("ticks").innerHTML = VISTE.map((_, i) => `<i class="${i === vista ? "on" : ""}"></i>`).join("");
+}
+function gira(d) { vista = (vista + d + VISTE.length) % VISTE.length; mostra(); }
+function render() {
+  const s = STAGIONI[stato.stagione];
+  $("misure").innerHTML = `<b>${stato.altezza} cm</b> · taglia <b>${stato.taglia || "—"}</b><br>budget <b>$ ${stato.budget}</b><div class="pal">${s.colori.map(c => `<i style="background:${c}"></i>`).join("")}</div>`;
+  const capo = CATALOGO.find(c => c.id === stato.capo), v = verdetto(capo), t = taglia(capo);
+  $("capo").innerHTML = `
+    <div class="piece-row">
+      <img class="thumb" src="img/capi/${capo.id}.jpg" alt="${capo.nome}, foto del negozio">
+      <div class="p-meta">
+        <span class="p-cat">${capo.tipo} · ${NEGOZIO.nome}</span>
+        <span class="p-name">${capo.nome}</span>
+        <span class="p-sub"><span class="tone" style="background:${capo.hex}"></span>${capo.colore} · <span class="${v.ok ? "good" : "warn"}">${v.testo}</span></span>
+        <span class="p-sub">$ ${capo.prezzo}${capo.prezzo > stato.budget ? ' · <span class="warn">sopra il budget</span>' : ""} · <span class="${t.ok ? "" : "warn"}">${t.testo}</span></span>
+      </div>
+    </div>
+    <div class="row2">
+      <button class="ghost" id="cambia">Cambia capo</button>
+      <a class="ghost dark" href="${NEGOZIO.url}${capo.id}" target="_blank" rel="noopener">Compra sul sito ↗</a>
+    </div>`;
+  $("cambia").onclick = apriCatalogo;
+  save(); mostra();
+}
+
+// ---- catalogo ----
+function apriCatalogo() { renderCatalogo(); $("catalogo").classList.add("open"); $("catalogo").setAttribute("aria-hidden", "false"); }
+function chiudiCatalogo() { $("catalogo").classList.remove("open"); $("catalogo").setAttribute("aria-hidden", "true"); }
+function renderCatalogo() {
+  const f = stato.filtri;
+  $("filtri").innerHTML = `<button class="chip" data-f="budget" aria-pressed="${f.budget}">entro $ ${stato.budget}</button><button class="chip" data-f="palette" aria-pressed="${f.palette}">solo in palette</button><button class="chip" data-f="taglia" aria-pressed="${!!f.taglia}">c'è la ${stato.taglia || "mia taglia"}</button>`;
+  const motivi = c => [
+    f.budget && c.prezzo > stato.budget && "sopra il budget",
+    f.palette && verdetto(c).ok < 2 && verdetto(c).testo,
+    f.taglia && !taglia(c).ok && "taglia non prodotta",
+  ].filter(Boolean);
+  const dentro = CATALOGO.filter(c => !motivi(c).length), fuori = CATALOGO.filter(c => motivi(c).length);
+  $("conteggio").textContent = `${dentro.length} capi · ${fuori.length} esclusi dai filtri`;
+  const card = (c, esc) => `<button class="card" data-id="${c.id}" aria-current="${c.id === stato.capo}"${esc ? ' style="opacity:.55"' : ""}>
+      <img src="img/capi/${c.id}.jpg" alt="" loading="lazy">
+      <b>${c.nome}</b>
+      <small><span class="tone" style="background:${c.hex}"></span>${c.colore} · $ ${c.prezzo}</small>
+      <small class="${esc ? "why" : verdetto(c).ok ? "good" : "warn"}">${esc ? "escluso: " + motivi(c).join(", ") : verdetto(c).testo}</small>
+    </button>`;
+  $("griglia").innerHTML = dentro.map(c => card(c, false)).join("") + fuori.map(c => card(c, true)).join("");
+}
+$("filtri").onclick = e => { const b = e.target.closest("button"); if (!b) return; stato.filtri[b.dataset.f] = !stato.filtri[b.dataset.f]; save(); renderCatalogo(); };
+$("griglia").onclick = e => { const b = e.target.closest(".card"); if (!b) return; stato.capo = b.dataset.id; chiudiCatalogo(); render(); toast("Addosso: " + CATALOGO.find(c => c.id === stato.capo).nome); };
+$("chiudi").onclick = chiudiCatalogo;
+$("apri-catalogo").onclick = apriCatalogo;
+$("profilo").onclick = () => { initMisure(); show("s-misure"); };
+$("gira-sx").onclick = () => gira(-1);
+$("gira-dx").onclick = () => gira(1);
+
+// Trascinare col dito gira l'avatar: un passo ogni 60 px.
+(() => {
+  let x0 = null, passi = 0;
+  const st = $("stage");
+  st.addEventListener("pointerdown", e => { if (e.target.closest("button")) return; x0 = e.clientX; passi = 0; st.setPointerCapture(e.pointerId); });
+  st.addEventListener("pointermove", e => { if (x0 === null) return; const p = Math.trunc((e.clientX - x0) / 60); if (p !== passi) { gira(p > passi ? 1 : -1); passi = p; } });
+  const fine = () => { x0 = null; };
+  st.addEventListener("pointerup", fine); st.addEventListener("pointercancel", fine);
+  document.addEventListener("keydown", e => { if ($("s-camerino").hidden) return; if (e.key === "ArrowLeft") gira(-1); if (e.key === "ArrowRight") gira(1); });
+})();
+
+initMisure(); initPalette();
+if (stato.stagione && stato.taglia) { show("s-camerino"); render(); } else show("s-misure");
+</script>
+</body>
+</html>
