@@ -335,9 +335,15 @@ def dal_vivo(host, handle):
 
 
 def esiste(host, handle):
-    r = subprocess.run(["curl", "-s", "-o", "/dev/null", "-m", "20", "-A", "Mozilla/5.0", *ITALIA, "-w", "%{http_code}",
-                        f"https://{host}/products/{handle}.js"], capture_output=True, text=True).stdout
-    return r != "404"  # solo il 404 conta: un errore di rete non deve togliere capi
+    """False solo se il negozio dice 404. Se frena (429) si aspetta e si riprova: contarlo come "esiste" lasciava
+    nel catalogo capi nascosti."""
+    for attesa in (0, 2, 5, 10, 20, 40):
+        time.sleep(attesa)
+        r = subprocess.run(["curl", "-s", "-o", "/dev/null", "-m", "20", "-A", "Mozilla/5.0", *ITALIA, "-w", "%{http_code}",
+                            f"https://{host}/products/{handle}.js"], capture_output=True, text=True).stdout
+        if r != "429":
+            return r != "404"
+    return True  # non si è riusciti a saperlo: meglio tenerlo, l'app lo gestisce se manca
 
 
 def togli_nascosti(host, capi_negozio):
@@ -345,11 +351,11 @@ def togli_nascosti(host, capi_negozio):
     se più di 1 su 10 manca, si verificano tutti i capi del negozio e si tolgono quelli nascosti."""
     maniglie = sorted({c["h"] for c in capi_negozio})
     campione = random.sample(maniglie, min(20, len(maniglie)))
-    with ThreadPoolExecutor(4) as ex:
+    with ThreadPoolExecutor(2) as ex:
         mancano = sum(1 for ok in ex.map(lambda h: esiste(host, h), campione) if not ok)
     if mancano <= len(campione) // 10:
         return capi_negozio, 0
-    with ThreadPoolExecutor(4) as ex:
+    with ThreadPoolExecutor(2) as ex:
         vive = {h for h, ok in zip(maniglie, ex.map(lambda h: esiste(host, h), maniglie)) if ok}
     return [c for c in capi_negozio if c["h"] in vive], len(maniglie) - len(vive)
 
