@@ -325,7 +325,7 @@ def leggi_negozio(dominio, cache):
 def dal_vivo(host, handle):
     """La scheda dell'app legge /products/<capo>.js dal browser: serve CORS aperto. Restituisce il dominio finale
     (dopo i reindirizzamenti al dominio principale) o None se il negozio non è leggibile dal browser."""
-    r = subprocess.run(["curl", "-sL", "-m", "20", "-A", "Mozilla/5.0", "-H", "Origin: https://example.com", "-D", "-", "-o", "/dev/null",
+    r = subprocess.run(["curl", "-sL", "-m", "20", "-A", "Mozilla/5.0", *ITALIA, "-H", "Origin: https://example.com", "-D", "-", "-o", "/dev/null",
                         "-w", "\nFINALE %{http_code} %{url_effective}", f"https://{host}/products/{handle}.js"], capture_output=True, text=True).stdout
     finale = r.rsplit("FINALE ", 1)[-1].split()
     ultima = r.lower().rsplit("\nhttp/", 1)[-1]  # intestazioni dell'ultima risposta
@@ -335,7 +335,7 @@ def dal_vivo(host, handle):
 
 
 def esiste(host, handle):
-    r = subprocess.run(["curl", "-s", "-o", "/dev/null", "-m", "20", "-A", "Mozilla/5.0", "-w", "%{http_code}",
+    r = subprocess.run(["curl", "-s", "-o", "/dev/null", "-m", "20", "-A", "Mozilla/5.0", *ITALIA, "-w", "%{http_code}",
                         f"https://{host}/products/{handle}.js"], capture_output=True, text=True).stdout
     return r != "404"  # solo il 404 conta: un errore di rete non deve togliere capi
 
