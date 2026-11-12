@@ -1,0 +1,68 @@
+# Ogni notte: rilegge i negozi, rifà il catalogo e pubblica l'app su GitHub Pages.
+# Il catalogo non viene salvato nel repository (crescerebbe di ~1,5 MB al giorno): va solo nella pubblicazione.
+# Se il catalogo nuovo esce troppo piccolo (negozi che bloccano, rete), la pubblicazione salta e resta quella di ieri.
+name: Catalogo e pubblicazione
+
+on:
+  schedule:
+    - cron: "15 3 * * *"   # 04:15 / 05:15 ora italiana
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  catalogo:
+    # gira solo nella copia pubblica (quella con la pagina web), non nel progetto di sviluppo privato
+    if: github.repository == 'Sosukeaizen04/camerino-anteprima'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pillow==11.0.0
+      - name: Colori già misurati (si misura solo il nuovo)
+        uses: actions/cache@v4
+        with:
+          path: .cache/colori.json
+          key: colori-${{ github.run_id }}
+          restore-keys: colori-
+      - name: Catalogo
+        run: python scripts/catalogo.py
+      - name: Controllo minimo
+        run: |
+          python - <<'PY'
+          import json, sys
+          d = json.load(open("data/catalogo.json"))
+          n, neg = len(d["capi"]), len(d["negozi"])
+          print(f"{n} capi da {neg} negozi")
+          sys.exit(0 if n >= 15000 and neg >= 40 else "catalogo troppo piccolo: non pubblico")
+          PY
+      - name: Cartella da pubblicare
+        run: |
+          mkdir _sito
+          cp -r index.html privacy.html manifest.webmanifest img font data _sito/
+          [ -f robots.txt ] && cp robots.txt _sito/ || true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _sito
+
+  pubblica:
+    needs: catalogo
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - id: pages
+        uses: actions/deploy-pages@v4

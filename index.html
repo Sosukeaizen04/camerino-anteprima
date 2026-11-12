@@ -4,13 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>Camerino beta</title>
-<link rel="icon" href="data:,">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<title>Camerino</title>
+<link rel="icon" href="img/icona-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="img/icona-180.png">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-title" content="Camerino">
 <link rel="preconnect" href="https://cdn.shopify.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Cutive+Mono&display=swap">
 <style>
+/* caratteri ospitati qui (licenza OFL): niente richieste a Google Fonts */
+@font-face { font-family: "Courier Prime"; font-weight: 400; font-display: swap; src: url(font/courier-prime-400.woff2) format("woff2"); }
+@font-face { font-family: "Courier Prime"; font-weight: 700; font-display: swap; src: url(font/courier-prime-700.woff2) format("woff2"); }
+@font-face { font-family: "Cutive Mono"; font-weight: 400; font-display: swap; src: url(font/cutive-mono-400.woff2) format("woff2"); }
 /* Layout: app a schermo intero sul telefono, colonna di 430px al centro sul computer. Solo tema chiaro, per scelta (come il mockup approvato). */
 :root {
   --paper: #ffffff;
@@ -59,6 +64,12 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 .sizes button { width: 48px; height: 40px; border: 1px solid var(--rule); }
 .sizes button[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--paper); }
 .seasons { display: grid; gap: 8px; }
+.stili { display: flex; gap: 6px; flex-wrap: wrap; }
+.stili button { height: 34px; padding: 0 10px; border: 1px solid var(--rule); font-size: 13px; }
+.stili button[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.fuori-ue { font-size: 10px; letter-spacing: .06em; color: var(--warn); }
+.piede { flex: none; font-size: 11px; color: var(--ink-3); text-align: center; padding: 6px 0 10px; }
+.piede a { color: var(--ink-2); }
 .season { display: grid; grid-template-columns: 104px 1fr; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid var(--rule); text-align: left; }
 .season b { font-size: 14px; }
 .season small { display: block; font-size: 11px; color: var(--ink-2); }
@@ -173,6 +184,10 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
         <div class="lab"><span>Budget totale dell'outfit</span><output id="o-bud">€ 500</output></div>
         <input type="range" id="budget" min="100" max="3000" step="50" value="500" aria-label="Budget totale dell'outfit in euro">
       </div>
+      <div class="field">
+        <div class="lab"><span>Stili che ti piacciono</span><span style="text-transform:none;letter-spacing:0">facoltativo</span></div>
+        <div class="stili" id="stili"></div>
+      </div>
       <div class="ob-foot"><button class="cta" id="go-palette"><span>Avanti</span><span>→</span></button></div>
     </div>
   </section>
@@ -213,6 +228,7 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
     <div class="count pad" id="conteggio"></div>
     <div class="grid pad" id="griglia"><div class="carica">Carico il catalogo…</div></div>
     <button class="outfit-bar pad" id="outfit-bar" hidden></button>
+    <div class="piede pad"><a href="privacy.html">Privacy</a> · i link portano ai siti dei marchi</div>
 
     <div class="sheet" id="scheda" aria-hidden="true">
       <div class="sheet-top pad"><span class="logo" style="font-size:20px">Camerino</span><button class="icon" id="chiudi" aria-label="Chiudi">✕</button></div>
@@ -230,12 +246,17 @@ const STAGIONI = {
   autunno:   { nome: "Autunno",   desc: "calda e profonda", colori: ["#b7410e","#d4a017","#708238","#c19a6b","#5d3a1a","#2e4a3a","#7b2d26","#efe6d2"] },
   inverno:   { nome: "Inverno",   desc: "fredda e intensa", colori: ["#111111","#fafafa","#1b1f3b","#c8102e","#046307","#c71585","#3a3a40"] },
 };
-const TAGLIE = ["XXS","XS","S","M","L","XL","XXL"];
+const TAGLIE = ["XXS","XS","S","M","L","XL","XXL","3XL","4XL"];
 const CAT = { capospalla: "Capospalla", maglia: "Maglie", camicia: "Camicie", top: "Top", abito: "Abiti", gonna: "Gonne", pantaloni: "Pantaloni", jeans: "Jeans" };
-const VALUTA = { EUR: "€", USD: "$", GBP: "£", AUD: "A$", SEK: "kr", DKK: "kr", CAD: "C$" };
+const VALUTA = { EUR: "€", USD: "$", GBP: "£", AUD: "A$", SEK: "kr", DKK: "kr", NOK: "kr", CAD: "C$", NZD: "NZ$", CHF: "CHF" };
+// stili dei negozi (scelti a mano nello script del catalogo) e parole della ricerca che li richiamano
+const STILI = { Parigino: /parigin|francese|chic/, Minimal: /minimal|essenzial|basic|sobri/, Lusso: /lusso|luxury|lussuos/, Romantico: /romantic|bon ?ton|fiori|floreal/,
+  Boho: /boho|hippie|etnic/, Colore: /colorat|fantasi|stampat/, Italiano: /italian/, Maglieria: /\bmaglieria/, Sostenibile: /sostenibil|ecologic|\bbio\b|riciclat/,
+  Denim: /\bdenim/, Curvy: /curvy|taglie forti|morbid|plus ?size/, Sportivo: /sport|palestra|yoga|pilates|corsa/, Streetwear: /street|urban/,
+  Sera: /\bfesta|party|discoteca|paillettes|glitter/, Rock: /\brock|dark|gotic|punk/ };
 
 const $ = id => document.getElementById(id);
-const stato = load() || { taglia: null, budget: 500, stagione: null, outfit: [], filtri: { budget: true, palette: true, taglia: true }, cat: null };
+const stato = Object.assign({ stili: [], soloUe: false }, load() || { taglia: null, budget: 500, stagione: null, outfit: [], filtri: { budget: true, palette: true, taglia: true }, cat: null });
 let DATI = null, risultati = [], mostrati = 0;
 
 function load() { try { return JSON.parse(localStorage.getItem("camerino-beta-2")); } catch { return null; } }
@@ -269,24 +290,34 @@ function verdetto(capo) {
 
 // ---- taglie: stessa conversione dello script del catalogo (scripts/catalogo.py) ----
 const NUM = {
-  FR: {32:"XXS",34:"XS",36:"S",38:"M",40:"L",42:"XL",44:"XXL"},
-  IT: {36:"XXS",38:"XS",40:"S",42:"M",44:"L",46:"XL",48:"XXL"},
-  UK: {4:"XXS",6:"XS",8:"S",10:"M",12:"L",14:"XL",16:"XXL"},
-  AU: {4:"XXS",6:"XS",8:"S",10:"M",12:"L",14:"XL",16:"XXL"},
-  US: {0:"XXS",2:"XS",4:"S",6:"M",8:"L",10:"XL",12:"XXL"},
+  FR: {32:"XXS",34:"XS",36:"S",38:"M",40:"L",42:"XL",44:"XXL",46:"3XL",48:"4XL",50:"4XL"},
+  IT: {36:"XXS",38:"XS",40:"S",42:"M",44:"L",46:"XL",48:"XXL",50:"3XL",52:"4XL",54:"4XL"},
+  UK: {4:"XXS",6:"XS",8:"S",10:"M",12:"L",14:"XL",16:"XXL",18:"3XL",20:"4XL",22:"4XL"},
+  AU: {4:"XXS",6:"XS",8:"S",10:"M",12:"L",14:"XL",16:"XXL",18:"3XL",20:"4XL",22:"4XL"},
+  US: {0:"XXS",2:"XS",4:"S",6:"M",8:"L",10:"XL",12:"XXL",14:"3XL",16:"3XL",18:"4XL",20:"4XL",22:"4XL",24:"4XL",26:"4XL",28:"4XL",30:"4XL",32:"4XL",34:"4XL",36:"4XL",38:"4XL",40:"4XL"},
 };
 const VITA = {23:"XXS",24:"XXS",25:"XS",26:"S",27:"S",28:"M",29:"M",30:"L",31:"L",32:"XL",33:"XXL",34:"XXL"};
+const PAROLE_TAGLIA = [["XX-SMALL","XXS"],["XXSMALL","XXS"],["X-SMALL","XS"],["XSMALL","XS"],["EXTRASMALL","XS"],["SMALL","S"],
+  ["MEDIUM","M"],["XX-LARGE","XXL"],["XXLARGE","XXL"],["X-LARGE","XL"],["XLARGE","XL"],["EXTRALARGE","XL"],["LARGE","L"]];
 const UNICA = /^(o\/?s|one ?size|one|os|tu|taille unique|taglia unica|unica|u|default title)$/i;
 function lettera(e, sistema, cat) {
   e = (e || "").trim();
   if (UNICA.test(e)) return "*";
-  const up = e.toUpperCase().replace(/ /g, "");
-  let m = up.match(/^(XXS|XS|S|M|L|XL|XXL)(?:[\/-](XXS|XS|S|M|L|XL|XXL))?\b/);
+  let up = e.toUpperCase().replace(/ /g, "");
+  for (const [lunga, corta] of PAROLE_TAGLIA) up = up.replaceAll(lunga, corta);
+  let m = up.match(/^\w+_(\d+)-\d+$/);
+  if (m) return NUM.US[+m[1]] || null;
+  up = up.replace(/PLUS$/, "");
+  if (/^\d+$/.test(up) && up !== e) e = up;
+  up = { "1XL": "XXL", "2XL": "XXL", "1X": "XXL", "2X": "XXL", "XXXL": "3XL", "3X": "3XL", "4X": "4XL" }[up] || up;
+  m = up.match(/^(XXS|XS|3XL|4XL|XXL|XL|S|M|L)(?:[\/-](XXS|XS|3XL|4XL|XXL|XL|S|M|L))?\b/);
   if (m) return m[1] + (m[2] ? "/" + m[2] : "");
   for (const pre of ["IT","FR","EU","UK","AU","US"]) {
     m = e.toUpperCase().match(new RegExp(pre + "\\s*(\\d+)"));
     if (m) return NUM[pre === "EU" ? "FR" : pre][+m[1]] || null;
   }
+  m = e.toUpperCase().match(/^(\d+)\s*(IT|FR|EU|UK|AU|US)$/);
+  if (m) return NUM[m[2] === "EU" ? "FR" : m[2]][+m[1]] || null;
   if (/^\d+$/.test(e)) {
     const n = +e;
     if ((cat === "jeans" || cat === "pantaloni") && n >= 23 && n <= 34 && ["US","AU","UK"].includes(sistema)) return VITA[n] || null;
@@ -349,10 +380,13 @@ function capisci(testo) {
   for (const [w, hex] of Object.entries(PAROLE_COLORE)) if (new RegExp(`\\b${w}\\b`).test(t)) { q.colore = w; q.hex = hex; break; }
   const p = t.match(/(?:sotto|entro|max|massimo|meno di|fino a|under)\s*(?:i\s*|€\s*)?(\d{2,4})/) || t.match(/(\d{2,4})\s*(?:€|euro)/);
   if (p) q.max = +p[1];
+  q.stile = Object.keys(STILI).find(k => STILI[k].test(t)) || null;
   q.mat = Object.keys(MATERIALI).filter(m => new RegExp(`\\b${m}`).test(t));
   // negozio: basta una parola distintiva del nome ("frankie", "rouje", "manila")
-  const VUOTE = ["the", "shop", "brand", "paris", "studio", "und"];
-  if (DATI) q.negozio = DATI.negozi.findIndex(n => n.nome.toLowerCase().split(/[^a-zà-ü']+/).some(w => w.length > 2 && !VUOTE.includes(w) && new RegExp(`\\b${w}\\b`).test(t)));
+  const VUOTE = ["the", "shop", "brand", "paris", "studio", "und", "set", "with", "good", "house", "home", "of"];
+  const piano = x => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const tp = piano(t);
+  if (DATI) q.negozio = DATI.negozi.findIndex(n => piano(n.nome).split(/[^a-z']+/).some(w => w.length > 2 && !VUOTE.includes(w) && new RegExp(`\\b${w}\\b`).test(tp)));
   return q;
 }
 let query = capisci("");
@@ -366,6 +400,9 @@ function initMisure() {
   $("taglie").innerHTML = TAGLIE.map(t => `<button aria-pressed="${stato.taglia === t}" data-t="${t}">${t}</button>`).join("");
   $("taglie").onclick = e => { const b = e.target.closest("button"); if (!b) return; stato.taglia = b.dataset.t; for (const x of $("taglie").children) x.setAttribute("aria-pressed", x === b); $("go-palette").disabled = false; };
   $("go-palette").disabled = !stato.taglia;
+  $("stili").innerHTML = Object.keys(STILI).map(k => `<button aria-pressed="${stato.stili.includes(k)}" data-s="${k}">${k}</button>`).join("");
+  $("stili").onclick = e => { const b = e.target.closest("button"); if (!b) return; const k = b.dataset.s;
+    stato.stili = stato.stili.includes(k) ? stato.stili.filter(x => x !== k) : [...stato.stili, k]; b.setAttribute("aria-pressed", stato.stili.includes(k)); };
   $("go-palette").onclick = () => { save(); initPalette(); show("s-palette"); };
 }
 function scegliStagione(k) {
@@ -465,10 +502,14 @@ function cerca() {
   const f = stato.filtri, cat = query.cat || stato.cat, max = query.max || (f.budget ? resto() : Infinity);
   const qlab = query.hex ? lab(query.hex) : null;
   const neg = query.negozio >= 0 ? query.negozio : null;
+  const stileQ = query.stile, stiliOk = stato.stili.length ? new Set(stato.stili) : null;
   const motivo = c => {
     if (cat && c.c !== cat) return "cat";
     if (query.sottoRx && !query.sottoRx.test(c.t.toLowerCase())) return "cat";
     if (neg !== null && c.n !== neg) return "neg";
+    if (stileQ && DATI.negozi[c.n].stile !== stileQ) return "stile";
+    if (!stileQ && neg === null && stiliOk && !stiliOk.has(DATI.negozi[c.n].stile)) return "stile";
+    if (stato.soloUe && !DATI.negozi[c.n].ue) return "ue";
     if (qlab && (!c.x || dist(lab(c.x), qlab) > 16)) return "col";
     if (query.mat.length && !query.mat.every(m => MATERIALI[m].test(c.t.toLowerCase()))) return "mat";
     if (c.e > max) return "budget";
@@ -490,6 +531,7 @@ function cerca() {
   if (query.colore) pezzi.push(query.colore);
   query.mat.forEach(m => pezzi.push(m));
   if (neg !== null) pezzi.push(DATI.negozi[neg].nome);
+  if (query.stile) pezzi.push("stile " + query.stile.toLowerCase());
   if (query.max) pezzi.push("fino a € " + query.max);
   $("capito").innerHTML = query.testo ? (pezzi.length ? "Cerco: <b>" + esc(pezzi.join(" · ")) + "</b>" : "Non ho capito cosa cerchi: prova con un capo, un colore o un prezzo.") : "";
 
@@ -497,6 +539,8 @@ function cerca() {
     `<button class="chip" data-f="budget" aria-pressed="${f.budget || !!query.max}">${query.max ? "entro € " + query.max : stato.outfit.length ? "restano € " + resto() : "entro € " + stato.budget}</button>` +
     `<button class="chip" data-f="taglia" aria-pressed="${f.taglia}">c'è la ${stato.taglia}</button>` +
     `<button class="chip" data-f="palette" aria-pressed="${f.palette && !qlab}">nella mia palette</button>` +
+    `<button class="chip" data-f="ue" aria-pressed="${stato.soloUe}">senza dogana</button>` +
+    (stato.stili.length || stato.stiliSpenti?.length ? `<button class="chip" data-f="stili" aria-pressed="${!!stato.stili.length && !query.stile && neg === null}">i miei stili</button>` : "") +
     Object.entries(CAT).map(([k, n]) => `<button class="chip" data-c="${k}" aria-pressed="${cat === k}">${n}</button>`).join("");
   const nota = [esclusi.budget && `${esclusi.budget} sopra budget`, esclusi.taglia && `${esclusi.taglia} senza la tua taglia`, esclusi.palette && `${esclusi.palette} fuori palette`].filter(Boolean);
   $("conteggio").textContent = `${risultati.length.toLocaleString("it")} capi da ${new Set(risultati.map(c => c.n)).size} negozi` + (nota.length ? ` · esclusi: ${nota.join(", ")}` : "");
@@ -508,7 +552,7 @@ function card(c) {
   const v = verdetto(c);
   return `<button class="card" data-i="${DATI.capi.indexOf(c)}">
     <img src="${img(c)}" alt="" loading="lazy">
-    <span class="brand">${esc(DATI.negozi[c.n].nome)}</span>
+    <span class="brand">${esc(DATI.negozi[c.n].nome)}${DATI.negozi[c.n].ue ? "" : ' <span class="fuori-ue">· extra UE</span>'}</span>
     <b>${esc(c.t)}</b>
     <small>${prezzo(c)}</small>
     <small class="${v.ok === 2 ? "good" : v.ok === 0 ? "warn" : ""}">${c.x ? `<span class="tone" style="background:${c.x}"></span>` : ""}${esc(c.k || "")}${c.k ? " · " : ""}${v.testo}</small>
@@ -526,6 +570,11 @@ $("filtri").onclick = e => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.c) { const c = b.dataset.c; if (query.cat) { query.cat = null; } stato.cat = stato.cat === c ? null : c; }
   else if (b.dataset.f === "budget" && query.max) { query.max = null; }
+  else if (b.dataset.f === "ue") { stato.soloUe = !stato.soloUe; }
+  else if (b.dataset.f === "stili") {
+    if (stato.stili.length) { stato.stiliSpenti = stato.stili; stato.stili = []; toast("Mostro tutti gli stili"); }
+    else { stato.stili = stato.stiliSpenti || []; stato.stiliSpenti = null; }
+  }
   else stato.filtri[b.dataset.f] = !stato.filtri[b.dataset.f];
   save(); cerca();
 };
@@ -545,7 +594,8 @@ async function apri(c) {
       <span class="brand">${esc(neg.nome)} · ${CAT[c.c]}</span>
       <h3>${esc(c.t)}</h3>
       <span class="sub" id="prezzo">${prezzo(c)}${!nelOutfit(c) && c.e > resto() ? ' · <span class="warn">supera il budget rimasto</span>' : ""}</span>
-      <span class="sub verdetto">${c.x ? `<span class="tone" style="background:${c.x}"></span>` : ""}${esc(c.k || "")}${c.k ? " · " : ""}<span class="${v.ok === 2 ? "good" : v.ok === 0 ? "warn" : ""}">${v.testo}</span></span>
+      <span class="sub verdetto">${c.x ? `<span class="tone" style="background:${c.x}"></span>` : ""}${esc(c.k || "")}${c.m ? " (stimato dalla foto)" : ""}${c.k ? " · " : ""}<span class="${v.ok === 2 ? "good" : v.ok === 0 ? "warn" : ""}">${v.testo}</span></span>
+      ${neg.ue ? "" : `<span class="sub warn">Spedisce da fuori dell'Unione europea: alla consegna possono esserci dazi e IVA, controlla sul sito.</span>`}
     </div>
     <div class="live">
       <div class="lab"><span>Disponibilità sul sito di ${esc(neg.nome)}</span><span id="ora"></span></div>
@@ -560,6 +610,12 @@ async function apri(c) {
   provaAvatar(c);
   try {
     const r = await fetch(`https://${neg.dominio}/products/${c.h}.js`);
+    if (r.status === 404) {
+      $("tg").innerHTML = `<span class="warn">Questo capo non è più in vendita sul sito di ${esc(neg.nome)}.</span>`;
+      $("compra").remove(); $("metti").remove();
+      DATI.capi = DATI.capi.filter(x => x !== c); risultati = risultati.filter(x => x !== c);
+      return;
+    }
     if (!r.ok) throw new Error(r.status);
     const p = await r.json();
     const nomi = p.options.map(o => typeof o === "string" ? o : o.name);
@@ -642,7 +698,7 @@ $("outfit-bar").onclick = apriOutfit;
 function chiudi() { $("scheda-corpo").onclick = null; $("scheda").classList.remove("open"); $("scheda").setAttribute("aria-hidden", "true"); }
 $("chiudi").onclick = chiudi;
 document.addEventListener("keydown", e => { if (e.key === "Escape") chiudi(); });
-$("profilo").onclick = () => { initMisure(); show("s-misure"); };
+$("profilo").onclick = () => { if (!stato.stili.length && stato.stiliSpenti) { stato.stili = stato.stiliSpenti; stato.stiliSpenti = null; } initMisure(); show("s-misure"); };
 
 initMisure(); initPalette();
 if (stato.stagione && stato.taglia) entra(); else show("s-misure");
