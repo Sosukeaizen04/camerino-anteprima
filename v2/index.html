@@ -189,6 +189,7 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
       <div class="viste" role="tablist">
         <button class="piccolo" id="vista-capi" aria-pressed="true">I capi</button>
         <button class="piccolo" id="vista-addosso" aria-pressed="false">Addosso</button>
+        <button class="piccolo" id="condividi" style="margin-left:auto">Condividi</button>
       </div>
       <div class="palco" id="palco"></div>
       <div id="avviso"></div>
@@ -200,6 +201,19 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
       <button class="pieno" id="principale">Compra</button>
       <button class="icona" id="salva" aria-label="Salva questo outfit" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.600-7 10-7 10z"/></svg></button>
     </div>
+  </section>
+
+  <!-- outfit ricevuto da un link -->
+  <section class="schermo" id="s-condiviso" hidden>
+    <header class="testa lati"><span class="logo">camerino</span></header>
+    <div class="corpo lati">
+      <p class="dove" style="margin:0 0 8px">Un outfit condiviso con te</p>
+      <div class="palco" id="cond-palco"></div>
+      <div class="posti" id="cond-posti"></div>
+      <div class="totale" id="cond-totale"></div>
+      <p class="note" id="cond-nota"></p>
+    </div>
+    <div class="fondo lati" style="grid-template-columns:1fr"><button class="pieno" id="cond-prova"></button></div>
   </section>
 
   <div class="foglio" id="foglio" aria-hidden="true">

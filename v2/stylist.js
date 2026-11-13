@@ -8,7 +8,9 @@ export const NOME_POSTO = { capospalla: "Capospalla", sopra: "Sopra", sotto: "So
 const POSTO_DI = { top: "sopra", camicia: "sopra", maglia: "sopra", pantaloni: "sotto", jeans: "sotto", gonna: "sotto",
   abito: "abito", capospalla: "capospalla", scarpe: "scarpe" };
 export const postoDi = capo => POSTO_DI[capo.c];
-export const chiave = c => `${c.n}|${c.h}|${c.v ?? ""}`;
+// `z` è il dominio del negozio, messo dall'app al caricamento: l'indice `n` cambia se una notte un negozio salta,
+// e gli outfit salvati o condivisi devono restare validi.
+export const chiave = c => `${c.z ?? c.n}|${c.h}|${c.v ?? ""}`;
 
 // ---------- l'outfit ----------
 // Un outfit è { capospalla, sopra, sotto, scarpe, abito } (capo o null). L'abito occupa sopra e sotto.

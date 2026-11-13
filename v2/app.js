@@ -17,6 +17,7 @@ let salvati = salvato.salvati || [];          // [{ capi: [chiavi], quando }]
 let vista = "capi";
 let DATI = null, INDICE = new Map(), esclusi = new Set(), manca = [];
 let seme = Date.now() % 1e9;
+let genereDati = null, daProvare = null;
 
 function ricorda() {
   try {
@@ -144,16 +145,28 @@ $("apri-profilo").onclick = apriProfilo;
 // ======================================================================
 // CAMERINO
 // ======================================================================
+/** Carica i capi di un genere ("d" o "u"). Restituisce false se la rete non va. */
+async function carica(g) {
+  try { DATI = await (await fetch(`../data/v2-${g === "u" ? "uomo" : "donna"}.json`)).json(); } catch { DATI = null; return false; }
+  for (const c of DATI.capi) c.z = DATI.negozi[c.n].dominio;
+  INDICE = new Map(DATI.capi.map(c => [S.chiave(c), c]));
+  genereDati = g;
+  return true;
+}
 async function entra() {
   mostra("s-camerino");
+  if (DATI && genereDati !== profilo.genere) DATI = null;
   if (!DATI) {
     $("palco").innerHTML = `<div class="addosso"><div class="solo-testo">Apro il camerino…</div></div>`; $("posti").innerHTML = ""; $("budget").innerHTML = "";
-    try { DATI = await (await fetch(`../data/v2-${profilo.genere === "u" ? "uomo" : "donna"}.json`)).json(); }
-    catch { $("palco").innerHTML = `<div class="addosso"><div class="solo-testo">Non riesco a caricare i capi. Controlla la connessione e riapri.</div></div>`; return; }
-    INDICE = new Map(DATI.capi.map(c => [S.chiave(c), c]));
+    if (!await carica(profilo.genere)) { $("palco").innerHTML = `<div class="addosso"><div class="solo-testo">Non riesco a caricare i capi. Controlla la connessione e riapri.</div></div>`; return; }
     outfit = S.outfitVuoto();
     for (const [p, k] of Object.entries(salvato.outfit || {})) if (k && INDICE.has(k)) outfit[p] = INDICE.get(k);
     salvato.outfit = null;
+  }
+  if (daProvare) {                       // outfit arrivato da un link: lo si indossa al posto di comporne uno
+    outfit = S.outfitVuoto(); bloccati.clear(); manca = [];
+    for (const k of daProvare) { const c = INDICE.get(k); if (c) outfit = S.metti(outfit, c).outfit; }
+    daProvare = null; history.replaceState(null, "", location.pathname); ricorda();
   }
   if (!S.capiDi(outfit).length) await componi(false);
   else disegna();
@@ -238,6 +251,10 @@ function disegnaPalco() {
     $("come-sara").onclick = apriAddosso;
     return;
   }
+  $("palco").innerHTML = tavola(outfit, true);
+}
+/** La tavola dei capi: le foto dei negozi nell'ordine del corpo. `tocchi` = i riquadri si possono toccare. */
+function tavola(outfit, tocchi) {
   const tess = (p, primo) => {
     const c = outfit[p];
     if (!c) return `<button class="tessera manca" data-cambia="${p}"><span style="position:static;background:none;padding:0;letter-spacing:0;text-transform:none;font-size:12px"><b>${S.NOME_POSTO[p]}</b>da scegliere</span></button>`;
@@ -245,7 +262,7 @@ function disegnaPalco() {
   };
   const ordine = [outfit.capospalla ? "capospalla" : null, ...(outfit.abito ? ["abito"] : ["sopra", "sotto"]), "scarpe"].filter(Boolean);
   const [primo, ...resto] = ordine;
-  $("palco").innerHTML = `<div class="tavola">${tess(primo, true)}<div class="destra" style="grid-template-rows:${resto.map(p => p === "scarpe" && resto.length > 1 ? ".6fr" : "1fr").join(" ")}">${resto.map(p => tess(p)).join("")}</div></div>`;
+  return `<div class="tavola">${tess(primo, true)}<div class="destra" style="grid-template-rows:${resto.map(p => p === "scarpe" && resto.length > 1 ? ".6fr" : "1fr").join(" ")}">${resto.map(p => tess(p)).join("")}</div></div>`;
 }
 $("vista-capi").onclick = () => { vista = "capi"; disegnaPalco(); };
 $("vista-addosso").onclick = () => { vista = "addosso"; disegnaPalco(); };
@@ -379,7 +396,7 @@ function fraseTaglia(c, e) {
     "non-prodotta": `<span class="male">Questo capo non viene fatto nella ${mia}.</span>`, sparito: `<span class="male">Non è più in vendita sul sito di ${esc(negozio(c).nome)}.</span>`,
     ignoto: `Non riesco a controllare adesso: guarda sul sito.` }[e.stato];
 }
-async function apriScheda(c, livello = 1) {
+async function apriScheda(c, livello = 1, sola = false) {   // sola = solo da guardare (outfit ricevuto da un link)
   const neg = negozio(c), p = S.postoDi(c), dentro = outfit[p] && S.chiave(outfit[p]) === S.chiave(c);
   const d = S.distPalette(c, profilo.stagione);
   const colore = !c.k ? "" : `${c.x ? `<span class="tono" style="background:${c.x}"></span>` : ""}${esc(c.k)}${c.m ? " (stimato dalla foto)" : ""}` +
@@ -392,7 +409,8 @@ async function apriScheda(c, livello = 1) {
       <div class="taglie-vive" id="sc-taglie">Controllo adesso…</div><div class="riga" id="sc-mia"></div>
       <button class="${dentro ? "vuoto" : "pieno"}" id="sc-metti">${dentro ? "Toglilo dall'outfit" : "Mettilo nell'outfit"}</button>
       <a class="vuoto" id="sc-sito" href="${linkCapo(c)}" target="_blank" rel="noopener">Vedi sul sito di ${esc(neg.nome)} ↗</a></div>`, livello);
-  corpo.querySelector("#sc-metti").onclick = () => {
+  if (sola) corpo.querySelector("#sc-metti").remove();
+  else corpo.querySelector("#sc-metti").onclick = () => {
     if (dentro) { const prima = outfit; outfit = S.togli(outfit, p); bloccati.delete(p); ricorda(); disegna(); toast("Tolto dall'outfit", () => { outfit = prima; ricorda(); disegna(); }); }
     else indossa(c);
     chiudiFoglio(2); chiudiFoglio(1);
@@ -406,8 +424,9 @@ async function apriScheda(c, livello = 1) {
     corpo.querySelector("#sc-ora").textContent = "ore " + new Date().toLocaleTimeString("it", { hour: "2-digit", minute: "2-digit" });
     if (e.prezzoVivo != null && Math.abs(e.prezzoVivo - c.p) > 0.5) corpo.querySelector("#sc-prezzo").insertAdjacentHTML("beforeend", ` · <span class="male">ora ${Math.round(e.prezzoVivo)} sul sito</span>`);
   } else corpo.querySelector("#sc-taglie").textContent = "";
-  corpo.querySelector("#sc-mia").innerHTML = fraseTaglia(c, e);
-  corpo.querySelector("#sc-sito").href = linkCapo(c, e);
+  corpo.querySelector("#sc-mia").innerHTML = mia || e.stato === "sparito" ? fraseTaglia(c, e) : "";
+  corpo.querySelector("#sc-sito").href = linkCapo(c, mia ? e : null);
+  if (sola) corpo.querySelector("#sc-metti")?.remove();
   if (e.stato === "sparito") { corpo.querySelector("#sc-metti").remove(); corpo.querySelector("#sc-sito").remove(); }
 }
 
@@ -500,5 +519,55 @@ function apriAddosso() {
     <figure style="margin:6px 0 0"><img src="esempio-addosso.jpg" alt="Esempio: una modella con cappotto, maglione, pantaloni e sneakers" style="border:1px solid var(--riga)"><figcaption style="font-size:12px;color:var(--ink-3);margin-top:6px">Un esempio di come sarà l'immagine (capi dimostrativi).</figcaption></figure></div>`);
 }
 
+// ======================================================================
+// CONDIVIDI — un link che apre questo outfit; chi lo riceve lo guarda, lo compra o lo prova nel suo camerino
+// ======================================================================
+const b64 = { su: t => btoa(String.fromCharCode(...new TextEncoder().encode(t))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
+  giu: t => new TextDecoder().decode(Uint8Array.from(atob(t.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0))) };
+$("condividi").onclick = async () => {
+  const capi = S.capiDi(outfit); if (!capi.length) return toast("Non c'è ancora niente da condividere");
+  const url = `${location.origin}${location.pathname}?o=${b64.su(JSON.stringify({ g: profilo.genere, c: capi.map(S.chiave) }))}`;
+  const testo = `Guarda questo outfit: ${capi.length} capi, ${euro(S.totale(outfit))}`;
+  try {
+    if (navigator.share) await navigator.share({ title: "Camerino", text: testo, url });
+    else { await navigator.clipboard.writeText(url); toast("Link copiato: incollalo dove vuoi"); }
+  } catch (e) { if (e.name !== "AbortError") { try { await navigator.clipboard.writeText(url); toast("Link copiato: incollalo dove vuoi"); } catch { toast("Non riesco a condividere da questo browser"); } } }
+};
+function leggiCondiviso() {
+  try { const o = JSON.parse(b64.giu(new URLSearchParams(location.search).get("o"))); return ["d", "u"].includes(o.g) && Array.isArray(o.c) && o.c.length <= 6 ? o : null; } catch { return null; }
+}
+async function apriCondiviso(link) {
+  mostra("s-condiviso");
+  $("cond-palco").innerHTML = `<div class="addosso"><div class="solo-testo">Apro l'outfit…</div></div>`;
+  if (!await carica(link.g)) { $("cond-palco").innerHTML = `<div class="addosso"><div class="solo-testo">Non riesco a caricare l'outfit. Controlla la connessione e riapri il link.</div></div>`; return; }
+  let o = S.outfitVuoto();
+  const trovati = link.c.map(k => INDICE.get(k)).filter(Boolean);
+  for (const c of trovati) o = S.metti(o, c).outfit;
+  const proprio = () => { history.replaceState(null, "", location.pathname); if (profilo.pronto && profilo.genere) entra(); else apriProfilo(); };
+  if (!trovati.length) {
+    $("cond-palco").innerHTML = `<div class="addosso"><div class="solo-testo">Questi capi non sono più in vendita.</div></div>`;
+    $("cond-posti").innerHTML = ""; $("cond-totale").innerHTML = ""; $("cond-nota").textContent = "";
+    $("cond-prova").textContent = "Apri il camerino"; $("cond-prova").onclick = proprio; return;
+  }
+  $("cond-palco").innerHTML = tavola(o, true);
+  $("cond-posti").innerHTML = S.capiDi(o).map(c => `<div class="posto"><button class="mini" data-k="${esc(S.chiave(c))}"><img src="${foto(c, 120)}" alt=""></button>
+    <button class="chi" data-k="${esc(S.chiave(c))}"><div class="nome-posto">${S.NOME_POSTO[S.postoDi(c)]} · ${esc(negozio(c).nome)}</div><div class="titolo">${esc(c.t)}</div><div class="riga2">${c.x ? `<span class="tono" style="background:${c.x}"></span>` : ""}${prezzo(c)}</div></button>
+    <div class="azioni"><a class="piccolo" style="display:grid;place-items:center;text-decoration:none" href="${linkCapo(c)}" target="_blank" rel="noopener">Sito ↗</a></div></div>`).join("");
+  $("cond-totale").innerHTML = `<span>Totale</span><span>${euro(S.totale(o))}</span>`;
+  $("cond-nota").textContent = (trovati.length < link.c.length ? "Alcuni capi non sono più in vendita. " : "") + "Tocca un capo per vedere le taglie disponibili adesso.";
+  const apri = e => { const b = e.target.closest("[data-k],[data-apri]"); if (!b) return; const c = b.dataset.k ? INDICE.get(b.dataset.k) : o[b.dataset.apri]; if (c) apriScheda(c, 1, true); };
+  $("cond-posti").onclick = apri; $("cond-palco").onclick = apri;
+  const altroGenere = profilo.pronto && profilo.genere !== link.g;
+  $("cond-prova").textContent = altroGenere ? "Vai al mio camerino" : "Provalo nel mio camerino";
+  $("cond-prova").onclick = () => {
+    if (altroGenere) return proprio();
+    daProvare = trovati.map(S.chiave);
+    if (profilo.pronto) entra();
+    else { profilo.genere = link.g; daProfilo = false; passo = 1; mostra("s-profilo"); disegnaPasso(); }
+  };
+}
+
 // ---------- avvio ----------
-if (profilo.pronto && profilo.genere) entra(); else apriProfilo();
+const condiviso = leggiCondiviso();
+if (condiviso) apriCondiviso(condiviso);
+else if (profilo.pronto && profilo.genere) entra(); else apriProfilo();
