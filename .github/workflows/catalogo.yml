@@ -39,6 +39,8 @@ jobs:
           restore-keys: colori-
       - name: Catalogo
         run: python scripts/catalogo.py
+      - name: Catalogo del nuovo camerino (genere e scarpe), dagli stessi dati appena letti
+        run: python scripts/catalogo2.py
       - name: Controllo minimo
         run: |
           python - <<'PY'
@@ -51,7 +53,7 @@ jobs:
       - name: Cartella da pubblicare
         run: |
           mkdir _sito
-          cp -r index.html privacy.html manifest.webmanifest img font data _sito/
+          cp -r index.html privacy.html manifest.webmanifest img font data v2 _sito/
           [ -f robots.txt ] && cp robots.txt _sito/ || true
       - uses: actions/upload-pages-artifact@v3
         with:

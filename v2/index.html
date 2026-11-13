@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Camerino</title>
+<link rel="icon" href="../img/icona-192.png">
+<link rel="apple-touch-icon" href="../img/icona-180.png">
+<meta name="theme-color" content="#ffffff">
+<link rel="preconnect" href="https://cdn.shopify.com">
+<style>
+@font-face { font-family: "Courier Prime"; font-weight: 400; font-display: swap; src: url(../font/courier-prime-400.woff2) format("woff2"); }
+@font-face { font-family: "Courier Prime"; font-weight: 700; font-display: swap; src: url(../font/courier-prime-700.woff2) format("woff2"); }
+@font-face { font-family: "Cutive Mono"; font-weight: 400; font-display: swap; src: url(../font/cutive-mono-400.woff2) format("woff2"); }
+/* Stile del mockup approvato il 9–12/10: bianco, carattere da macchina da scrivere, solo tema chiaro. */
+:root {
+  --carta: #ffffff; --tavolo: #f1f1ee; --ink: #111111; --ink-2: #55554f; --ink-3: #9a9a93; --riga: #e6e6e1; --velo: #f6f6f4;
+  --rosso: #a33a1a; --verde: #2f5a3a;
+  --testo: "Courier Prime", "Courier New", Courier, ui-monospace, monospace;
+  --titolo: "Cutive Mono", "Courier Prime", "Courier New", monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--tavolo); color: var(--ink); font: 15px/1.45 var(--testo); }
+button, input { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; cursor: pointer; }
+a { color: inherit; }
+img { max-width: 100%; display: block; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+.app { position: relative; height: 100%; max-width: 430px; margin: 0 auto; background: var(--carta); display: flex; flex-direction: column; overflow: hidden; }
+.schermo { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.lati { padding-inline: max(20px, env(safe-area-inset-left, 0px)) max(20px, env(safe-area-inset-right, 0px)); }
+
+/* ---------- pulsanti ---------- */
+.pieno, .vuoto { height: 52px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 16px; font-size: 15px; text-decoration: none; border: 1px solid var(--ink); }
+.pieno { background: var(--ink); color: var(--carta); }
+.pieno[disabled] { background: var(--riga); border-color: var(--riga); color: var(--ink-3); cursor: not-allowed; }
+.piccolo { height: 34px; padding: 0 10px; border: 1px solid var(--riga); font-size: 12px; white-space: nowrap; }
+.piccolo[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--carta); }
+.icona { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--riga); }
+.icona svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+.testo-link { text-decoration: underline; text-underline-offset: 3px; font-size: 13px; color: var(--ink-2); }
+
+/* ---------- profilo (4 passi) ---------- */
+.passo { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; padding-block: 18px 0; }
+.dove { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); display: flex; justify-content: space-between; align-items: center; min-height: 24px; }
+.passo h1 { font: 400 30px/1.1 var(--titolo); margin: 14px 0 8px; text-wrap: balance; }
+.passo .sotto { margin: 0 0 18px; color: var(--ink-2); font-size: 14px; }
+.campo { display: grid; gap: 10px; padding: 16px 0; border-top: 1px solid var(--riga); }
+.etichetta { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); display: flex; justify-content: space-between; align-items: baseline; }
+.etichetta output { color: var(--ink); font-weight: 700; letter-spacing: 0; text-transform: none; font-size: 16px; }
+.scelte { display: flex; gap: 6px; flex-wrap: wrap; }
+.scelte button { min-width: 46px; height: 40px; padding: 0 10px; border: 1px solid var(--riga); font-size: 14px; }
+.scelte button[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--carta); }
+.grandi { display: grid; gap: 10px; margin-top: 8px; }
+.grandi button { height: 76px; border: 1px solid var(--ink); font: 400 22px var(--titolo); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
+.grandi button[aria-pressed="true"] { background: var(--ink); color: var(--carta); }
+input[type=range] { width: 100%; accent-color: var(--ink); }
+.stagione { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid var(--riga); text-align: left; width: 100%; }
+.stagione small { display: block; font-size: 11px; color: var(--ink-2); }
+.stagione[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.pallini { display: flex; gap: 4px; justify-content: flex-end; flex-wrap: wrap; }
+.pallini i { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(0,0,0,.12); }
+.stagioni { display: grid; gap: 8px; }
+.esito { font-size: 13px; padding: 10px 12px; border: 1px solid var(--ink); }
+.interruttore { display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer; }
+.interruttore input { width: 20px; height: 20px; accent-color: var(--ink); }
+.piede { position: sticky; bottom: 0; background: var(--carta); padding-block: 14px max(14px, env(safe-area-inset-bottom, 0px)); margin-top: auto; display: grid; gap: 10px; }
+.piede .pieno { width: 100%; justify-content: space-between; }
+
+/* ---------- camerino ---------- */
+.testa { flex: none; display: flex; align-items: center; justify-content: space-between; padding-block: 10px 6px; }
+.logo { font: 400 23px var(--titolo); }
+.testa nav { display: flex; gap: 6px; }
+.budget { flex: none; padding-bottom: 8px; }
+.budget .cifre { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--ink-2); }
+.budget .cifre b { font-size: 16px; color: var(--ink); }
+.budget .barra { height: 4px; background: var(--riga); margin-top: 5px; }
+.budget .barra i { display: block; height: 100%; background: var(--ink); max-width: 100%; transition: width .25s; }
+.budget.sfora .barra i { background: var(--rosso); }
+.budget.sfora .resto { color: var(--rosso); }
+.corpo { flex: 1; min-height: 0; overflow-y: auto; }
+.viste { display: flex; gap: 6px; margin-bottom: 8px; }
+.palco { position: relative; height: min(46vh, 400px); background: var(--velo); border: 1px solid var(--riga); }
+.tavola { position: absolute; inset: 0; display: grid; grid-template-columns: 1.15fr 1fr; gap: 2px; background: var(--carta); }
+.tavola .destra { display: grid; gap: 2px; min-height: 0; }
+.tessera { position: relative; min-height: 0; overflow: hidden; background: var(--velo); width: 100%; height: 100%; text-align: left; }
+.tessera img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center top; }
+.tessera.scarpe img { object-fit: contain; object-position: center; }
+.tessera span { position: absolute; left: 6px; bottom: 6px; background: var(--carta); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; padding: 2px 6px; }
+.tessera.manca { display: grid; place-items: center; text-align: center; border: 1px dashed var(--ink-3); color: var(--ink-2); font-size: 12px; padding: 8px; }
+.tessera.manca b { display: block; font-size: 13px; color: var(--ink); }
+.addosso { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--carta); }
+.addosso img { flex: 1; min-height: 0; width: 100%; object-fit: contain; }
+.addosso .dice { flex: none; padding: 10px 12px; border-top: 1px solid var(--riga); font-size: 12px; color: var(--ink-2); display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.addosso .solo-testo { flex: 1; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--ink-2); font-size: 14px; }
+.avviso { margin: 10px 0 0; padding: 10px 12px; border: 1px solid var(--ink); font-size: 13px; }
+.posti { margin-top: 6px; }
+.posto { display: grid; grid-template-columns: 48px 1fr auto; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--riga); }
+.posto .mini { width: 48px; height: 60px; background: var(--velo); border: 1px solid var(--riga); overflow: hidden; }
+.posto .mini img { width: 100%; height: 100%; object-fit: cover; object-position: center top; }
+.posto .chi { min-width: 0; text-align: left; }
+.posto .nome-posto { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.posto .titolo { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.posto .riga2 { font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.posto .azioni { display: flex; gap: 5px; }
+.posto.vuoto-posto .titolo { font-weight: 400; color: var(--ink-2); }
+.tono { display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 1px solid rgba(0,0,0,.18); margin-right: 3px; }
+.bene { color: var(--verde); } .male { color: var(--rosso); }
+.fondo .pieno, .fondo .vuoto { font-size: 14px; white-space: nowrap; padding: 0 8px; }
+.fondo { flex: none; display: grid; grid-template-columns: 1fr 1.3fr 52px; gap: 6px; padding-block: 10px max(10px, env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--ink); }
+.fondo .icona { width: 52px; height: 52px; border-color: var(--ink); }
+.fondo .icona[aria-pressed="true"] svg { fill: currentColor; }
+.note { font-size: 11px; color: var(--ink-3); margin: 10px 0 14px; }
+
+/* ---------- foglio (scheda, cambia, compra, cerca, salvati) ---------- */
+.foglio { position: absolute; inset: 0; background: var(--carta); z-index: 20; display: flex; flex-direction: column; transform: translateY(100%); transition: transform .28s ease; visibility: hidden; }
+.foglio.aperto { transform: none; visibility: visible; }
+.foglio-testa { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-block: 10px 8px; }
+.foglio-testa h2 { font: 400 20px var(--titolo); margin: 0; }
+.foglio-corpo { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: max(18px, env(safe-area-inset-bottom, 0px)); }
+.filtri { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
+.filtri::-webkit-scrollbar { display: none; }
+.griglia { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 10px; align-content: start; }
+.carta { text-align: left; display: grid; gap: 3px; align-content: start; }
+.carta img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; object-position: center top; background: var(--velo); border: 1px solid var(--riga); }
+.carta .marca { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+.carta b { font-size: 13px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.carta small { font-size: 11px; color: var(--ink-2); }
+.altri { grid-column: 1 / -1; }
+.niente { grid-column: 1 / -1; color: var(--ink-2); padding: 18px 0; font-size: 14px; }
+.conta { font-size: 12px; color: var(--ink-2); padding-bottom: 8px; }
+.cerca { display: flex; border: 1px solid var(--ink); margin-bottom: 8px; }
+.cerca input { flex: 1; min-width: 0; border: 0; padding: 0 12px; height: 46px; background: none; font-size: 16px; }
+.cerca input:focus { outline: none; }
+.cerca button { width: 50px; border-left: 1px solid var(--ink); display: grid; place-items: center; }
+.foto { position: relative; aspect-ratio: 3 / 4; max-height: 50vh; width: 100%; background: var(--velo); border: 1px solid var(--riga); }
+.foto img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.dettagli { display: grid; gap: 4px; padding: 12px 0; }
+.dettagli .marca { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.dettagli h3 { margin: 0; font-size: 17px; line-height: 1.25; }
+.dettagli .riga { font-size: 13px; color: var(--ink-2); }
+.vivo { border-top: 1px solid var(--ink); padding: 12px 0; display: grid; gap: 8px; }
+.taglie-vive { display: flex; gap: 5px; flex-wrap: wrap; font-size: 13px; }
+.taglie-vive span { min-width: 40px; height: 32px; padding: 0 6px; display: grid; place-items: center; border: 1px solid var(--riga); font-size: 12px; }
+.taglie-vive span.si { border-color: var(--ink); }
+.taglie-vive span.no { color: var(--ink-3); text-decoration: line-through; }
+.taglie-vive span.mia { box-shadow: inset 0 0 0 1px var(--ink); font-weight: 700; }
+.acquisto { display: grid; grid-template-columns: 56px 1fr; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--riga); }
+.acquisto img { width: 56px; height: 72px; object-fit: cover; object-position: center top; border: 1px solid var(--riga); }
+.acquisto .stato { font-size: 12px; }
+.acquisto .pieno { height: 40px; font-size: 13px; margin-top: 8px; }
+.totale { display: flex; justify-content: space-between; padding: 14px 0 4px; font-weight: 700; }
+.salvato { padding: 12px 0; border-bottom: 1px solid var(--riga); display: grid; gap: 8px; }
+.salvato .strip { display: flex; gap: 4px; }
+.salvato .strip img { width: 54px; height: 70px; object-fit: cover; object-position: center top; border: 1px solid var(--riga); }
+.salvato .sotto-strip { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+
+.toast { position: absolute; left: 50%; bottom: 86px; transform: translate(-50%, 16px); background: var(--ink); color: var(--carta); font-size: 13px; padding: 9px 14px; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; z-index: 40; display: flex; gap: 14px; align-items: center; max-width: calc(100% - 32px); }
+.toast.su { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.toast button { color: var(--carta); text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .foglio, .toast, .budget .barra i { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- profilo, 4 passi -->
+  <section class="schermo" id="s-profilo" hidden>
+    <div class="passo lati" id="passo"></div>
+  </section>
+
+  <!-- camerino: la casa dell'app -->
+  <section class="schermo" id="s-camerino" hidden>
+    <header class="testa lati">
+      <span class="logo">camerino</span>
+      <nav>
+        <button class="icona" id="apri-cerca" aria-label="Cerca un capo"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></button>
+        <button class="icona" id="apri-salvati" aria-label="Outfit salvati"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.600-7 10-7 10z"/></svg></button>
+        <button class="icona" id="apri-profilo" aria-label="Taglie, colori e budget"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.500-4 4.500-6 8-6s6.500 2 8 6"/></svg></button>
+      </nav>
+    </header>
+    <div class="budget lati" id="budget"></div>
+    <div class="corpo lati">
+      <div class="viste" role="tablist">
+        <button class="piccolo" id="vista-capi" aria-pressed="true">I capi</button>
+        <button class="piccolo" id="vista-addosso" aria-pressed="false">Addosso</button>
+      </div>
+      <div class="palco" id="palco"></div>
+      <div id="avviso"></div>
+      <div class="posti" id="posti"></div>
+      <p class="note">Ogni capo si compra sul sito del suo marchio. Prezzi e taglie sono controllati lì quando apri o componi un outfit.</p>
+    </div>
+    <div class="fondo lati">
+      <button class="vuoto" id="altro">Altro outfit</button>
+      <button class="pieno" id="principale">Compra</button>
+      <button class="icona" id="salva" aria-label="Salva questo outfit" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.600-7 10-7 10z"/></svg></button>
+    </div>
+  </section>
+
+  <div class="foglio" id="foglio" aria-hidden="true">
+    <div class="foglio-testa lati"><h2 id="foglio-titolo"></h2><button class="icona" id="foglio-chiudi" aria-label="Chiudi">✕</button></div>
+    <div class="foglio-corpo lati" id="foglio-corpo"></div>
+  </div>
+  <div class="foglio" id="foglio2" aria-hidden="true" style="z-index:30">
+    <div class="foglio-testa lati"><h2 id="foglio2-titolo"></h2><button class="icona" id="foglio2-chiudi" aria-label="Chiudi">✕</button></div>
+    <div class="foglio-corpo lati" id="foglio2-corpo"></div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
