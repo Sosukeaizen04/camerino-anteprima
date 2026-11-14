@@ -14,10 +14,9 @@ profilo.freddo = mesiFreddi();            // la stagione viene dal calendario; "
 let outfit = S.outfitVuoto();
 let bloccati = new Set(salvato.bloccati || []);
 let salvati = salvato.salvati || [];          // [{ capi: [chiavi], quando }]
-let vista = "capi";
 let DATI = null, INDICE = new Map(), esclusi = new Set(), manca = [];
 let seme = Date.now() % 1e9;
-let genereDati = null, daProvare = null;
+let genereDati = null, daProvare = null, vistaAvatar = 0;
 
 function ricorda() {
   try {
@@ -33,7 +32,12 @@ function prezzo(c) {
   const v = negozio(c).valuta;
   return v === "EUR" ? euro(c.p) : `${VALUTA[v] || v} ${Math.round(c.p)} · circa ${euro(c.e)}`;
 }
-function mostra(id) { for (const s of document.querySelectorAll(".schermo")) s.hidden = s.id !== id; }
+/** Mostra uno schermo; la barra in basso c'è solo in Camerino e Scopri. */
+function mostra(id) {
+  for (const s of document.querySelectorAll(".schermo")) s.hidden = s.id !== id;
+  $("schede").hidden = !(id === "s-camerino" || id === "s-scopri");
+  for (const b of $("schede").children) { if ("s-" + b.dataset.s === id) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); }
+}
 
 // ---------- avvisi brevi, con "Annulla" ----------
 function toast(testo, annulla) {
@@ -57,7 +61,7 @@ $("foglio2-chiudi").onclick = () => chiudiFoglio(2);
 document.addEventListener("keydown", e => { if (e.key === "Escape") { if ($("foglio2").classList.contains("aperto")) chiudiFoglio(2); else chiudiFoglio(1); } });
 
 // ======================================================================
-// PROFILO — quattro domande, poi si entra con un outfit già composto
+// PROFILO — quattro passi, poi si entra con un look già composto
 // ======================================================================
 const PASSI = ["chi", "taglie", "colori", "budget"];
 let passo = 0, daProfilo = false;
@@ -69,23 +73,23 @@ function disegnaPasso() {
   const scelte = (id, valori, attuale) => `<div class="scelte" id="${id}">${valori.map(v => `<button data-v="${v}" aria-pressed="${attuale === v}">${v}</button>`).join("")}</div>`;
 
   if (nome === "chi") {
-    el.innerHTML = `${dove}<h1>Per chi cerchi?</h1><p class="sotto">Ti mostriamo solo i capi giusti.</p>
+    el.innerHTML = `${dove}<h1>Donna o uomo?</h1>
       <div class="grandi" id="genere">
         <button data-v="d" aria-pressed="${profilo.genere === "d"}"><span>Donna</span><span>→</span></button>
         <button data-v="u" aria-pressed="${profilo.genere === "u"}"><span>Uomo</span><span>→</span></button>
       </div>`;
     $("genere").onclick = e => {
       const b = e.target.closest("button"); if (!b) return;
-      if (profilo.genere !== b.dataset.v) { profilo.genere = b.dataset.v; profilo.scarpa = null; DATI = null; outfit = S.outfitVuoto(); bloccati.clear(); }
+      if (profilo.genere !== b.dataset.v) { profilo.genere = b.dataset.v; profilo.scarpa = null; DATI = null; outfit = S.outfitVuoto(); bloccati.clear(); vistaAvatar = 0; }
       passo++; disegnaPasso();
     };
   }
   if (nome === "taglie") {
     const numeri = profilo.genere === "u" ? S.NUMERI_SCARPE.filter(n => n >= 39) : S.NUMERI_SCARPE.filter(n => n <= 42);
     const pronto = () => profilo.tagliaSopra && profilo.tagliaSotto && profilo.scarpa;
-    el.innerHTML = `${dove}<h1>Le tue taglie</h1><p class="sotto">Vedrai solo capi che ci sono nella tua taglia. Restano su questo telefono.</p>
-      <div class="campo"><div class="etichetta"><span>Sopra</span><span>maglie, camicie, giacche</span></div>${scelte("t-sopra", S.TAGLIE, profilo.tagliaSopra)}</div>
-      <div class="campo"><div class="etichetta"><span>Sotto</span><span>pantaloni${profilo.genere === "u" ? "" : ", gonne"}</span></div>${scelte("t-sotto", S.TAGLIE, profilo.tagliaSotto)}</div>
+    el.innerHTML = `${dove}<h1>Le tue taglie</h1>
+      <div class="campo"><div class="etichetta"><span>Sopra</span></div>${scelte("t-sopra", S.TAGLIE, profilo.tagliaSopra)}</div>
+      <div class="campo"><div class="etichetta"><span>Sotto</span></div>${scelte("t-sotto", S.TAGLIE, profilo.tagliaSotto)}</div>
       <div class="campo"><div class="etichetta"><span>Scarpe</span></div>${scelte("t-scarpe", numeri, profilo.scarpa)}</div>
       ${avanti("Avanti", pronto())}`;
     const lega = (id, campo, num) => $(id).onclick = e => {
@@ -98,36 +102,35 @@ function disegnaPasso() {
     lega("t-sopra", "tagliaSopra"); lega("t-sotto", "tagliaSotto"); lega("t-scarpe", "scarpa", true);
   }
   if (nome === "colori") {
-    el.innerHTML = `${dove}<h1>I tuoi colori</h1><p class="sotto">Se sai la tua stagione, sceglila. Se no puoi scoprirla da una foto del viso, oppure saltare.</p>
+    el.innerHTML = `${dove}<h1>I tuoi colori</h1><p class="sotto">Scegli la tua stagione. Se non la sai, usa una foto o salta.</p>
       <div class="stagioni" id="stagioni">${Object.entries(S.STAGIONI).map(([k, s]) => `<button class="stagione" data-v="${k}" aria-pressed="${profilo.stagione === k}"><span><b>${s.nome}</b><small>${s.desc}</small></span><span class="pallini">${s.colori.map(c => `<i style="background:${c}"></i>`).join("")}</span></button>`).join("")}</div>
       <div class="campo" style="margin-top:14px">
-        <label class="vuoto" style="cursor:pointer">Scoprila da una foto del viso<input type="file" id="selfie" accept="image/*" hidden></label>
+        <label class="vuoto" style="cursor:pointer">Usa una foto del viso<input type="file" id="selfie" accept="image/*" hidden></label>
         <div class="esito" id="esito" hidden></div>
-        <span style="font-size:12px;color:var(--ink-3)">La foto viene letta su questo telefono e non viene inviata. Meglio alla luce del giorno, senza filtri.</span>
       </div>
-      <div class="piede"><button class="pieno" id="avanti"><span>${profilo.stagione ? "Avanti" : "Salta per ora"}</span><span>→</span></button></div>`;
-    const segna = k => { profilo.stagione = profilo.stagione === k ? null : k; for (const x of $("stagioni").children) x.setAttribute("aria-pressed", x.dataset.v === profilo.stagione); $("avanti").firstElementChild.textContent = profilo.stagione ? "Avanti" : "Salta per ora"; };
+      <div class="piede"><button class="pieno" id="avanti"><span>${profilo.stagione ? "Avanti" : "Salta"}</span><span>→</span></button></div>`;
+    const segna = k => { profilo.stagione = profilo.stagione === k ? null : k; for (const x of $("stagioni").children) x.setAttribute("aria-pressed", x.dataset.v === profilo.stagione); $("avanti").firstElementChild.textContent = profilo.stagione ? "Avanti" : "Salta"; };
     $("stagioni").onclick = e => { const b = e.target.closest("button"); if (b) segna(b.dataset.v); };
     $("selfie").onchange = async e => {
       const f = e.target.files[0]; if (!f) return;
-      const out = $("esito"); out.hidden = false; out.textContent = "Leggo la foto…";
+      const out = $("esito"); out.hidden = false; out.textContent = "Un attimo…";
       try {
         const { stagioneDaFoto } = await import("./palette.js");
         const r = await stagioneDaFoto(f);
-        if (!r) { out.textContent = "Non trovo un viso in questa foto. Provane un'altra, di fronte e con buona luce."; return; }
+        if (!r) { out.textContent = "Qui non vedo un viso. Prova con una foto di fronte, in buona luce."; return; }
         if (profilo.stagione !== r.stagione) segna(r.stagione);
-        out.innerHTML = `Dalla foto: <b>${S.STAGIONI[r.stagione].nome}</b> (${r.caldo ? "toni caldi" : "toni freddi"}, ${r.profondo ? "colori profondi" : "colori chiari"}). È una stima: la luce la sposta. Se non ti torna, cambiala qui sopra.`;
-      } catch { out.textContent = "Non sono riuscito a leggere la foto (serve la connessione). Scegli tu qui sopra."; }
+        out.innerHTML = `Dalla foto: <b>${S.STAGIONI[r.stagione].nome}</b>. È una stima, la luce può ingannare: se non ti convince cambiala qui sopra.`;
+      } catch { out.textContent = "Non riesco a leggere la foto. Scegli tu qui sopra."; }
     };
   }
   if (nome === "budget") {
-    el.innerHTML = `${dove}<h1>Quanto vuoi spendere?</h1><p class="sotto">È il totale per tutto l'outfit, scarpe comprese.</p>
-      <div class="campo"><div class="etichetta"><span>Budget dell'outfit</span><output id="o-budget">${euro(profilo.budget)}</output></div>
-        <input type="range" id="i-budget" min="100" max="3000" step="50" value="${profilo.budget}" aria-label="Budget totale dell'outfit in euro"></div>
-      <div class="campo"><label class="interruttore"><input type="checkbox" id="i-capospalla" ${profilo.conCapospalla ? "checked" : ""}> Aggiungi giacca o cappotto</label></div>
-      <div class="campo"><div class="etichetta"><span>Stili che ti piacciono</span><span>facoltativo</span></div>
+    el.innerHTML = `${dove}<h1>Budget</h1><p class="sotto">Per tutto il look, scarpe comprese.</p>
+      <div class="campo"><div class="etichetta"><span>Fino a</span><output id="o-budget">${euro(profilo.budget)}</output></div>
+        <input type="range" id="i-budget" min="100" max="3000" step="50" value="${profilo.budget}" aria-label="Budget del look in euro"></div>
+      <div class="campo"><label class="interruttore"><input type="checkbox" id="i-capospalla" ${profilo.conCapospalla ? "checked" : ""}> Con giacca o cappotto</label></div>
+      <div class="campo"><div class="etichetta"><span>Stile</span><span>se vuoi</span></div>
         <div class="scelte" id="stili">${S.STILI.map(k => `<button data-v="${k}" aria-pressed="${profilo.stili.includes(k)}">${k}</button>`).join("")}</div></div>
-      ${avanti(daProfilo ? "Fatto" : "Entra nel camerino")}`;
+      ${avanti(daProfilo ? "Fatto" : "Entra")}`;
     $("i-budget").oninput = () => { profilo.budget = +$("i-budget").value; $("o-budget").textContent = euro(profilo.budget); };
     $("i-capospalla").onchange = () => { profilo.conCapospalla = $("i-capospalla").checked; };
     $("stili").onclick = e => { const b = e.target.closest("button"); if (!b) return; const k = b.dataset.v; profilo.stili = profilo.stili.includes(k) ? profilo.stili.filter(x => x !== k) : [...profilo.stili, k]; b.setAttribute("aria-pressed", profilo.stili.includes(k)); };
@@ -143,7 +146,7 @@ function apriProfilo() { daProfilo = profilo.pronto; passo = 0; mostra("s-profil
 $("apri-profilo").onclick = apriProfilo;
 
 // ======================================================================
-// CAMERINO
+// CAMERINO — l'avatar a tutto schermo, i capi del look di fianco
 // ======================================================================
 /** Carica i capi di un genere ("d" o "u"). Restituisce false se la rete non va. */
 async function carica(g) {
@@ -157,13 +160,13 @@ async function entra() {
   mostra("s-camerino");
   if (DATI && genereDati !== profilo.genere) DATI = null;
   if (!DATI) {
-    $("palco").innerHTML = `<div class="addosso"><div class="solo-testo">Apro il camerino…</div></div>`; $("posti").innerHTML = ""; $("budget").innerHTML = "";
-    if (!await carica(profilo.genere)) { $("palco").innerHTML = `<div class="addosso"><div class="solo-testo">Non riesco a caricare i capi. Controlla la connessione e riapri.</div></div>`; return; }
+    $("budget").innerHTML = ""; disegnaPalco("Un attimo…");
+    if (!await carica(profilo.genere)) { disegnaPalco("Non riesco a caricare i capi. Controlla la connessione e riapri."); return; }
     outfit = S.outfitVuoto();
     for (const [p, k] of Object.entries(salvato.outfit || {})) if (k && INDICE.has(k)) outfit[p] = INDICE.get(k);
     salvato.outfit = null;
   }
-  if (daProvare) {                       // outfit arrivato da un link: lo si indossa al posto di comporne uno
+  if (daProvare) {                       // look arrivato da un link: lo si indossa al posto di comporne uno
     outfit = S.outfitVuoto(); bloccati.clear(); manca = [];
     for (const k of daProvare) { const c = INDICE.get(k); if (c) outfit = S.metti(outfit, c).outfit; }
     daProvare = null; history.replaceState(null, "", location.pathname); ricorda();
@@ -176,10 +179,10 @@ async function entra() {
 async function componi(avvisa = true) {
   const prima = outfit;
   const posti = new Set([...bloccati].filter(p => outfit[p]));
-  let r = S.componi(DATI.capi, ctx(), outfit, posti, S.casuale(++seme));
+  const r = S.componi(DATI.capi, ctx(), outfit, posti, S.casuale(++seme));
   outfit = r.outfit; manca = r.manca;
   disegna(); ricorda();
-  if (avvisa && S.capiDi(prima).length) toast("Outfit nuovo", () => { outfit = prima; manca = []; disegna(); ricorda(); });
+  if (avvisa && S.capiDi(prima).length) toast("Nuovo look", () => { outfit = prima; manca = []; disegna(); ricorda(); });
   // verifica dal vivo: un capo esaurito o sparito viene sostituito, senza sforare
   for (let giro = 0; giro < 3; giro++) {
     const mio = outfit, esiti = await Promise.all(S.capiDi(mio).map(c => posti.has(S.postoDi(c)) ? null : verifica(c)));
@@ -196,120 +199,114 @@ async function componi(avvisa = true) {
   }
 }
 
+const LUCCHETTO = `<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`;
+const CUORE = `<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>`;
+const MANDA = `<svg viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M5 13v6h14v-6"/></svg>`;
+/** Le viste dell'avatar base: [file, a specchio]. Si gira trascinando. */
+const viste = () => profilo.genere === "u"
+  ? [["avatar_uomo_front", 0], ["avatar_uomo_side", 0], ["avatar_uomo_side", 1]]
+  : [["avatar_front", 0], ["avatar_side", 0], ["avatar_back", 0], ["avatar_side", 1]];
+
 function disegna() {
   // budget: un'informazione, non un pulsante
   const tot = S.totale(outfit), resto = profilo.budget - tot;
   $("budget").className = "budget lati" + (resto < 0 ? " sfora" : "");
-  $("budget").innerHTML = `<div class="cifre"><span><b>${euro(tot)}</b> di ${euro(profilo.budget)}</span><span class="resto">${resto < 0 ? "sfori di " + euro(-resto) : "restano " + euro(resto)}</span></div>
+  $("budget").innerHTML = `<div class="cifre"><span><b>${euro(tot)}</b> di ${euro(profilo.budget)}</span><span class="resto">${resto < 0 ? "oltre di " + euro(-resto) : "restano " + euro(resto)}</span></div>
     <div class="barra"><i style="width:${Math.min(100, tot / profilo.budget * 100)}%"></i></div>`;
-
   disegnaPalco();
 
-  // i posti dell'outfit
-  const righe = outfit.abito ? ["capospalla", "abito", "scarpe"] : ["capospalla", "sopra", "sotto", "scarpe"];
-  $("posti").innerHTML = righe.map(p => {
-    const c = outfit[p];
-    if (!c) {
-      const facolt = p === "capospalla";
-      return `<div class="posto vuoto-posto"><div class="mini"></div>
-        <button class="chi" data-cambia="${p}"><div class="nome-posto">${S.NOME_POSTO[p]}</div><div class="titolo">${facolt ? "Nessuno" : "Da scegliere"}</div><div class="riga2">${facolt ? "facoltativo" : "l'avatar porta un capo base"}</div></button>
-        <div class="azioni"><button class="piccolo" data-cambia="${p}">${facolt ? "Aggiungi" : "Scegli"}</button></div></div>`;
-    }
-    const taglia = S.haTaglia(c, profilo);
-    return `<div class="posto"><button class="mini" data-apri="${p}" aria-label="Apri ${esc(c.t)}"><img src="${foto(c, 120)}" alt="" loading="lazy"></button>
-      <button class="chi" data-apri="${p}"><div class="nome-posto">${S.NOME_POSTO[p]} · ${esc(negozio(c).nome)}</div><div class="titolo">${esc(c.t)}</div>
-        <div class="riga2">${c.x ? `<span class="tono" style="background:${c.x}"></span>` : ""}${prezzo(c)}${taglia ? "" : ` · <span class="male">non c'è la tua taglia</span>`}</div></button>
-      <div class="azioni"><button class="piccolo" data-cambia="${p}">Cambia</button><button class="piccolo" data-blocca="${p}" aria-pressed="${bloccati.has(p)}" title="Tienilo quando chiedi un altro outfit">${bloccati.has(p) ? "Tenuto" : "Tieni"}</button></div></div>`;
-  }).join("");
-
-  // avviso quando l'outfit non è completo
-  const m = S.mancanti(outfit), nomi = m.map(p => S.NOME_POSTO[p].toLowerCase());
+  const m = S.mancanti(outfit), nomi = m.map(p => ({ sopra: "il sopra", sotto: "il sotto", scarpe: "le scarpe" })[p]);
   let avviso = "";
-  if (m.length && manca.length) avviso = `Con ${euro(profilo.budget)} non riesco a completare l'outfit: ${manca.map(x => `${S.NOME_POSTO[x.posto].toLowerCase()} da ${euro(x.daEuro)}`).join(", ")}. Alza il budget dal profilo o cambia un capo con uno meno caro.`;
-  else if (m.length) avviso = `Manca${m.length > 1 ? "no" : ""} ${nomi.join(" e ")}. ${resto > 0 ? `Ti restano ${euro(resto)}.` : ""}`;
-  $("avviso").innerHTML = avviso ? `<p class="avviso">${avviso}</p>` : "";
+  if (m.length && manca.length) avviso = `Con ${euro(profilo.budget)} il look non si chiude: ${manca.map(x => `${S.NOME_POSTO[x.posto].toLowerCase()} da ${euro(x.daEuro)}`).join(", ")}. Alza il budget o scegli un capo meno caro.`;
+  else if (m.length) avviso = `Manca${m.length > 1 || m[0] === "scarpe" ? "no" : ""} ${nomi.join(m.length > 2 ? ", " : " e ")}.`;
+  $("avviso").hidden = !avviso; $("avviso").textContent = avviso;
 
   const p = $("principale");
-  if (m.length) { p.textContent = "Completa l'outfit"; p.onclick = () => componiMancanti(); }
+  if (m.length) { p.textContent = "Completa il look"; p.onclick = componiMancanti; }
   else { p.textContent = `Compra · ${euro(tot)}`; p.onclick = apriCompra; }
-  p.disabled = !S.capiDi(outfit).length && !m.length;
-  $("salva").setAttribute("aria-pressed", salvati.some(s => s.capi.join() === S.capiDi(outfit).map(S.chiave).join()));
 }
 /** Riempie solo i posti vuoti, tenendo tutto ciò che c'è. */
 async function componiMancanti() {
   const tutti = bloccati; bloccati = new Set(["capospalla", "sopra", "sotto", "scarpe", "abito"].filter(p => outfit[p]));
-  const conCapo = profilo.conCapospalla; if (outfit.capospalla === null) profilo.conCapospalla = false;   // non aggiunge un capospalla non chiesto
+  const conCapo = profilo.conCapospalla; if (outfit.capospalla === null) profilo.conCapospalla = false;   // non aggiunge una giacca non chiesta
   await componi(false);
   profilo.conCapospalla = conCapo; bloccati = tutti; disegna();
 }
 
-function disegnaPalco() {
-  $("vista-capi").setAttribute("aria-pressed", vista === "capi"); $("vista-addosso").setAttribute("aria-pressed", vista === "addosso");
-  if (vista === "addosso") {
-    const img = profilo.genere === "d" ? `<img src="../img/avatar_front.jpg" alt="Modello con i capi base">` : `<div class="solo-testo">Qui vedrai te, o un modello che ti somiglia, con questi capi addosso.</div>`;
-    $("palco").innerHTML = `<div class="addosso">${img}<div class="dice"><span>La prova addosso non è ancora attiva.</span><button class="piccolo" id="come-sara">Come sarà</button></div></div>`;
-    $("come-sara").onclick = apriAddosso;
-    return;
-  }
-  $("palco").innerHTML = tavola(outfit, true);
-}
-/** La tavola dei capi: le foto dei negozi nell'ordine del corpo. `tocchi` = i riquadri si possono toccare. */
-function tavola(outfit, tocchi) {
-  const tess = (p, primo) => {
+function disegnaPalco(messaggio) {
+  if (messaggio) { $("palco").innerHTML = `<div class="riquadro" style="position:absolute;inset:0;height:auto;border:0;background:none"><div class="solo-testo">${esc(messaggio)}</div></div>`; return; }
+  const vv = viste(), [file, specchio] = vv[vistaAvatar % vv.length];
+  const posti = outfit.abito ? ["capospalla", "abito", "scarpe"] : ["capospalla", "sopra", "sotto", "scarpe"];
+  const caselle = posti.map(p => {
     const c = outfit[p];
-    if (!c) return `<button class="tessera manca" data-cambia="${p}"><span style="position:static;background:none;padding:0;letter-spacing:0;text-transform:none;font-size:12px"><b>${S.NOME_POSTO[p]}</b>da scegliere</span></button>`;
-    return `<button class="tessera ${p}" data-apri="${p}" aria-label="${S.NOME_POSTO[p]}: ${esc(c.t)}"><img src="${foto(c, primo ? 500 : 360)}" alt=""><span>${S.NOME_POSTO[p]}</span></button>`;
-  };
-  const ordine = [outfit.capospalla ? "capospalla" : null, ...(outfit.abito ? ["abito"] : ["sopra", "sotto"]), "scarpe"].filter(Boolean);
-  const [primo, ...resto] = ordine;
-  return `<div class="tavola">${tess(primo, true)}<div class="destra" style="grid-template-rows:${resto.map(p => p === "scarpe" && resto.length > 1 ? ".6fr" : "1fr").join(" ")}">${resto.map(p => tess(p)).join("")}</div></div>`;
+    if (!c) return `<button class="casella libera" data-cambia="${p}" aria-label="Scegli: ${S.NOME_POSTO[p].toLowerCase()}">+<small>${S.NOME_POSTO[p]}</small></button>`;
+    return `<button class="casella ${p}" data-apri="${p}" aria-label="${S.NOME_POSTO[p]}: ${esc(c.t)}"><img src="${foto(c, 160)}" alt="">${bloccati.has(p) ? `<span class="lucchetto">${LUCCHETTO}</span>` : ""}<small>${S.NOME_POSTO[p]}</small></button>`;
+  }).join("");
+  const giaSalvato = salvati.some(s => s.capi.join() === S.capiDi(outfit).map(S.chiave).join());
+  $("palco").innerHTML = `<img class="avatar${specchio ? " specchio" : ""}" src="../img/${file}.jpg" alt="Avatar" draggable="false">
+    <button class="pillola" id="info-prova">I capi sull'avatar arrivano presto</button>
+    <div class="colonna">${caselle}</div>
+    <div class="attrezzi"><button class="icona" id="salva" aria-label="Salva questo look" aria-pressed="${giaSalvato}">${CUORE}</button><button class="icona" id="condividi" aria-label="Condividi questo look">${MANDA}</button></div>
+    <div class="punti">${vv.map((_, i) => `<i class="${i === vistaAvatar % vv.length ? "ora" : ""}"></i>`).join("")}</div>`;
 }
-$("vista-capi").onclick = () => { vista = "capi"; disegnaPalco(); };
-$("vista-addosso").onclick = () => { vista = "addosso"; disegnaPalco(); };
-$("altro").onclick = () => componi(true);
-
-// tocchi su palco e posti: apri il capo, cambialo, tienilo
-function tocco(e) {
-  const b = e.target.closest("[data-apri],[data-cambia],[data-blocca]"); if (!b) return;
+// girare l'avatar trascinando; un tocco fermo sulle caselle le apre
+let presa = null;
+$("palco").addEventListener("pointerdown", e => { if (e.target.closest("button")) return; presa = { x: e.clientX, passi: 0 }; $("palco").classList.add("gira"); $("palco").setPointerCapture(e.pointerId); });
+$("palco").addEventListener("pointermove", e => {
+  if (!presa) return;
+  const passi = Math.trunc((e.clientX - presa.x) / 55);
+  if (passi !== presa.passi) { const n = viste().length; vistaAvatar = ((vistaAvatar - (passi - presa.passi)) % n + n) % n; presa.passi = passi; disegnaPalco(); }
+});
+for (const ev of ["pointerup", "pointercancel"]) $("palco").addEventListener(ev, () => { presa = null; $("palco").classList.remove("gira"); });
+$("palco").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.apri) apriScheda(outfit[b.dataset.apri]);
   else if (b.dataset.cambia) apriCambia(b.dataset.cambia);
-  else { const p = b.dataset.blocca; bloccati.has(p) ? bloccati.delete(p) : bloccati.add(p); ricorda(); disegna(); }
-}
-$("palco").addEventListener("click", tocco); $("posti").addEventListener("click", tocco);
+  else if (b.id === "salva") salva();
+  else if (b.id === "condividi") condividi();
+  else if (b.id === "info-prova") apriInfoProva();
+});
+$("altro").onclick = () => componi(true);
 
-/** Mette un capo nell'outfit, con "Annulla" e l'avviso se ha sostituito altro. */
+/** Mette un capo nel look, con "Annulla" e l'avviso se ha sostituito altro. */
 function indossa(capo) {
   const prima = outfit, r = S.metti(outfit, capo);
   outfit = r.outfit; manca = [];
   for (const p of [...bloccati]) if (!outfit[p]) bloccati.delete(p);
   ricorda(); disegna();
   const tolti = r.tolti.filter(t => S.postoDi(t) !== S.postoDi(capo));
-  toast(tolti.length ? `Messo. Ho tolto ${tolti.map(t => S.NOME_POSTO[S.postoDi(t)].toLowerCase()).join(" e ")}` : "Messo nell'outfit", () => { outfit = prima; ricorda(); disegna(); });
+  toast(tolti.length ? `Aggiunto. Via ${tolti.map(t => S.NOME_POSTO[S.postoDi(t)].toLowerCase()).join(" e ")}` : "Aggiunto", () => { outfit = prima; ricorda(); disegna(); });
 }
 
-// ---------- salvare ----------
-$("salva").onclick = () => {
+// ---------- salvati ----------
+function salva() {
   const capi = S.capiDi(outfit).map(S.chiave); if (!capi.length) return;
   const i = salvati.findIndex(s => s.capi.join() === capi.join());
-  if (i >= 0) { salvati.splice(i, 1); toast("Tolto dai salvati"); } else { salvati.unshift({ capi, quando: Date.now() }); toast("Outfit salvato"); }
-  ricorda(); disegna();
-};
-$("apri-salvati").onclick = () => {
+  if (i >= 0) { salvati.splice(i, 1); toast("Tolto dai salvati"); } else { salvati.unshift({ capi, quando: Date.now() }); toast("Salvato"); }
+  ricorda(); disegnaPalco();
+}
+function apriSalvati() {
   const righe = salvati.map((s, i) => {
     const capi = s.capi.map(k => INDICE.get(k)).filter(Boolean);
     return `<div class="salvato"><div class="strip">${capi.map(c => `<img src="${foto(c, 120)}" alt="${esc(c.t)}">`).join("")}</div>
-      <div class="sotto-strip"><span>${capi.length} capi · ${euro(capi.reduce((t, c) => t + c.e, 0))}${capi.length < s.capi.length ? " · alcuni non ci sono più" : ""}</span>
-      <span style="display:flex;gap:6px"><button class="piccolo" data-indossa="${i}">Rimetti</button><button class="piccolo" data-via="${i}">Togli</button></span></div></div>`;
+      <div class="sotto-strip"><span>${capi.length} capi · ${euro(capi.reduce((t, c) => t + c.e, 0))}${capi.length < s.capi.length ? " · qualcuno non c'è più" : ""}</span>
+      <span style="display:flex;gap:6px"><button class="piccolo" data-indossa="${i}">Indossa</button><button class="piccolo" data-via="${i}">Elimina</button></span></div></div>`;
   }).join("");
-  const corpo = apriFoglio("Outfit salvati", righe || `<p class="niente">Non hai ancora salvato outfit. Tocca il cuore quando uno ti piace.</p>`);
+  const corpo = apriFoglio("Salvati", righe || `<p class="niente">Ancora niente. Il cuore nel camerino salva il look che stai guardando.</p>`);
   corpo.onclick = e => {
     const b = e.target.closest("button"); if (!b) return;
-    if (b.dataset.via) { salvati.splice(+b.dataset.via, 1); ricorda(); $("apri-salvati").onclick(); disegna(); return; }
+    if (b.dataset.via) { salvati.splice(+b.dataset.via, 1); ricorda(); apriSalvati(); disegnaPalco(); return; }
     const prima = outfit; outfit = S.outfitVuoto();
     for (const k of salvati[+b.dataset.indossa].capi) { const c = INDICE.get(k); if (c) outfit = S.metti(outfit, c).outfit; }
-    bloccati.clear(); manca = []; ricorda(); disegna(); chiudiFoglio();
-    toast("Outfit rimesso", () => { outfit = prima; ricorda(); disegna(); });
+    bloccati.clear(); manca = []; ricorda(); mostra("s-camerino"); disegna(); chiudiFoglio();
+    toast("Fatto", () => { outfit = prima; ricorda(); disegna(); });
   };
+}
+$("schede").onclick = e => {
+  const b = e.target.closest("button"); if (!b || !DATI) return;
+  if (b.dataset.s === "salvati") return apriSalvati();
+  chiudiFoglio(2); chiudiFoglio(1);
+  if (b.dataset.s === "scopri") { mostra("s-scopri"); scopri(); } else { mostra("s-camerino"); disegna(); }
 };
 
 // ======================================================================
@@ -321,30 +318,28 @@ const SOTTOFILTRI = {
   abito: [["abito", null, "Abiti"], ["sopra", null, "Sopra"], ["sotto", null, "Sotto"]],
   capospalla: [["capospalla", null, "Tutti"]], scarpe: [["scarpe", null, "Tutte"]],
 };
+const finto = posto => ({ c: posto === "abito" ? "abito" : posto === "sopra" ? "top" : posto === "sotto" ? "pantaloni" : posto, e: 0, n: 0, h: "", v: null });
 function apriCambia(postoIniziale) {
   const filtri = SOTTOFILTRI[postoIniziale].filter(f => !f[3] || f[3] === profilo.genere);
   let scelto = 0, lista = [], mostrati = 0, entro = 0;
-  const corpo = apriFoglio(`Cambia: ${S.NOME_POSTO[postoIniziale].toLowerCase()}`, "");
+  const corpo = apriFoglio(S.NOME_POSTO[postoIniziale], "");
   const carta = c => `<button class="carta" data-k="${esc(S.chiave(c))}"><img src="${foto(c)}" alt="" loading="lazy">
     <span class="marca">${esc(negozio(c).nome)}</span><b>${esc(c.t)}</b><small>${prezzo(c)}</small>
-    <small class="${c.e > entro ? "male" : ""}">${c.e > entro ? `${euro(c.e - entro)} oltre il budget` : "ci sta nel budget"}</small></button>`;
+    ${c.e > entro ? `<small class="male">+${euro(c.e - entro)} sul budget</small>` : ""}</button>`;
   const altri = () => {
     corpo.querySelector(".altri")?.remove();
     const lotto = lista.slice(mostrati, mostrati + 30); mostrati += lotto.length;
-    corpo.querySelector(".griglia").insertAdjacentHTML("beforeend", lotto.map(carta).join("") + (mostrati < lista.length ? `<button class="vuoto altri">Mostra altri</button>` : ""));
+    corpo.querySelector(".griglia").insertAdjacentHTML("beforeend", lotto.map(carta).join("") + (mostrati < lista.length ? `<button class="vuoto altri">Altri</button>` : ""));
   };
   const rifai = () => {
     const [posto, cat] = filtri[scelto];
-    // quanto si può spendere per questo posto: il budget meno gli altri capi che restano
-    const dopo = S.metti(outfit, { c: posto === "abito" ? "abito" : posto === "sopra" ? "top" : posto === "sotto" ? "pantaloni" : posto, e: 0, n: 0, h: "", v: null }).outfit;
-    entro = profilo.budget - S.totale(dopo);
+    entro = profilo.budget - S.totale(S.metti(outfit, finto(posto)).outfit);     // il budget meno gli altri capi che restano
     lista = S.alternative(DATI.capi, ctx(), outfit, posto, entro).filter(c => !cat || c.c === cat).filter(c => !outfit[posto] || S.chiave(c) !== S.chiave(outfit[posto]));
     mostrati = 0;
     const dentro = lista.filter(c => c.e <= entro).length;
     corpo.innerHTML = (filtri.length > 1 ? `<div class="filtri">${filtri.map((f, i) => `<button class="piccolo" data-f="${i}" aria-pressed="${i === scelto}">${f[2]}</button>`).join("")}</div>` : "") +
-      `<div class="conta">${entro > 0 ? `Puoi spendere fino a ${euro(entro)} · ${dentro.toLocaleString("it")} capi ci stanno` : "Hai già usato tutto il budget: questi capi lo sforano"}. In ordine di abbinamento con il resto. Taglia ${S.tagliaPer(profilo, { c: posto === "scarpe" ? "scarpe" : posto === "sotto" ? "pantaloni" : "top" })}.</div>
-      <div class="griglia"></div>`;
-    if (!lista.length) corpo.querySelector(".griglia").innerHTML = `<p class="niente">Non trovo capi nella tua taglia per questo posto.</p>`; else altri();
+      `<div class="conta">${entro > 0 ? `Fino a ${euro(entro)} · ${dentro.toLocaleString("it")} capi` : "Budget finito: questi vanno oltre"} · taglia ${S.tagliaPer(profilo, finto(posto))}</div><div class="griglia"></div>`;
+    if (!lista.length) corpo.querySelector(".griglia").innerHTML = `<p class="niente">Niente nella tua taglia, per ora.</p>`; else altri();
     corpo.scrollTop = 0;
   };
   rifai();
@@ -385,49 +380,52 @@ async function verifica(c) {
       esito = { stato: !var_ ? "non-prodotta" : var_.available ? "ok" : "esaurita", variante: var_?.id, taglie: per, prezzoVivo: var_ ? var_.price / 100 : null, unica: !per.has(mia) && per.has("Unica") };
     }
   } catch { esito = { stato: "ignoto" }; }
-  if (esito.stato === "sparito") { esclusi.add(k); }
+  if (esito.stato === "sparito") esclusi.add(k);
   vive.set(k, { quando: Date.now(), esito });
   return esito;
 }
 const linkCapo = (c, e) => `https://${negozio(c).dominio}/products/${c.h}${e?.variante ? "?variant=" + e.variante : ""}`;
 function fraseTaglia(c, e) {
   const mia = S.tagliaPer(profilo, c);
-  return { ok: `<span class="bene">La ${e.unica ? "taglia unica" : mia} c'è, adesso.</span>`, esaurita: `<span class="male">La ${mia} è finita in questo momento.</span>`,
-    "non-prodotta": `<span class="male">Questo capo non viene fatto nella ${mia}.</span>`, sparito: `<span class="male">Non è più in vendita sul sito di ${esc(negozio(c).nome)}.</span>`,
-    ignoto: `Non riesco a controllare adesso: guarda sul sito.` }[e.stato];
+  return { ok: `<span class="bene">${e.unica ? "Taglia unica" : mia} disponibile</span>`, esaurita: `<span class="male">${mia} esaurita</span>`,
+    "non-prodotta": `<span class="male">Non c'è in ${mia}</span>`, sparito: `<span class="male">Non più in vendita</span>`, ignoto: `Controlla la taglia sul sito` }[e.stato];
 }
-async function apriScheda(c, livello = 1, sola = false) {   // sola = solo da guardare (outfit ricevuto da un link)
-  const neg = negozio(c), p = S.postoDi(c), dentro = outfit[p] && S.chiave(outfit[p]) === S.chiave(c);
+/** `sola` = solo da guardare (look ricevuto da un link). */
+async function apriScheda(c, livello = 1, sola = false) {
+  const neg = negozio(c), p = S.postoDi(c), dentro = !sola && outfit[p] && S.chiave(outfit[p]) === S.chiave(c);
   const d = S.distPalette(c, profilo.stagione);
-  const colore = !c.k ? "" : `${c.x ? `<span class="tono" style="background:${c.x}"></span>` : ""}${esc(c.k)}${c.m ? " (stimato dalla foto)" : ""}` +
-    (d === null ? "" : ` · <span class="${d < 18 ? "bene" : d >= 30 ? "male" : ""}">${d < 18 ? "tra i tuoi colori" : d < 30 ? "vicino ai tuoi colori" : "fuori dai tuoi colori"}</span>`);
+  const colore = !c.k ? "" : `${c.x ? `<span class="tono" style="background:${c.x}"></span>` : ""}${esc(c.k)}` +
+    (d === null ? "" : ` · <span class="${d < 18 ? "bene" : d >= 30 ? "male" : ""}">${d < 18 ? "nei tuoi colori" : d < 30 ? "vicino ai tuoi colori" : "fuori dai tuoi colori"}</span>`);
+  const azioni = dentro ? `<div class="tre"><button class="piccolo" id="sc-cambia">Cambia</button><button class="piccolo" id="sc-blocca" aria-pressed="${bloccati.has(p)}">${bloccati.has(p) ? "Bloccato" : "Blocca"}</button><button class="piccolo" id="sc-togli">Togli</button></div>` : "";
   const corpo = apriFoglio(S.NOME_POSTO[p], `
-    <div class="foto"><img src="${foto(c, 900)}" alt="${esc(c.t)}, foto del negozio"></div>
+    <div class="foto"><img src="${foto(c, 900)}" alt="${esc(c.t)}"></div>
     <div class="dettagli"><span class="marca">${esc(neg.nome)}</span><h3>${esc(c.t)}</h3><span class="riga" id="sc-prezzo">${prezzo(c)}</span>${colore ? `<span class="riga">${colore}</span>` : ""}
-      ${neg.ue ? "" : `<span class="riga male">Spedisce da fuori dall'Unione europea: alla consegna possono esserci dazi e IVA.</span>`}</div>
-    <div class="vivo"><div class="etichetta"><span>Taglie sul sito di ${esc(neg.nome)}</span><span id="sc-ora"></span></div>
-      <div class="taglie-vive" id="sc-taglie">Controllo adesso…</div><div class="riga" id="sc-mia"></div>
-      <button class="${dentro ? "vuoto" : "pieno"}" id="sc-metti">${dentro ? "Toglilo dall'outfit" : "Mettilo nell'outfit"}</button>
+      ${neg.ue ? "" : `<span class="riga male">Spedito da fuori UE: possibili dazi alla consegna.</span>`}</div>
+    <div class="vivo">${azioni}
+      <div class="etichetta"><span>Taglie</span><span id="sc-ora"></span></div>
+      <div class="taglie-vive" id="sc-taglie">…</div><div class="riga" id="sc-mia"></div>
+      ${dentro || sola ? "" : `<button class="pieno" id="sc-metti">Indossa</button>`}
       <a class="vuoto" id="sc-sito" href="${linkCapo(c)}" target="_blank" rel="noopener">Vedi sul sito di ${esc(neg.nome)} ↗</a></div>`, livello);
-  if (sola) corpo.querySelector("#sc-metti").remove();
-  else corpo.querySelector("#sc-metti").onclick = () => {
-    if (dentro) { const prima = outfit; outfit = S.togli(outfit, p); bloccati.delete(p); ricorda(); disegna(); toast("Tolto dall'outfit", () => { outfit = prima; ricorda(); disegna(); }); }
-    else indossa(c);
-    chiudiFoglio(2); chiudiFoglio(1);
-  };
+  const chiudi = () => { chiudiFoglio(2); chiudiFoglio(1); };
+  const q = id => corpo.querySelector(id);
+  if (q("#sc-metti")) q("#sc-metti").onclick = () => { chiudi(); mostra("s-camerino"); indossa(c); };
+  if (dentro) {
+    q("#sc-cambia").onclick = () => apriCambia(p);
+    q("#sc-blocca").onclick = () => { bloccati.has(p) ? bloccati.delete(p) : bloccati.add(p); ricorda(); disegnaPalco(); q("#sc-blocca").setAttribute("aria-pressed", bloccati.has(p)); q("#sc-blocca").textContent = bloccati.has(p) ? "Bloccato" : "Blocca"; if (bloccati.has(p)) toast("Resta quando chiedi un nuovo look"); };
+    q("#sc-togli").onclick = () => { const prima = outfit; outfit = S.togli(outfit, p); bloccati.delete(p); ricorda(); disegna(); chiudi(); toast("Tolto", () => { outfit = prima; ricorda(); disegna(); }); };
+  }
   const e = await verifica(c);
-  if (!corpo.querySelector("#sc-taglie")) return;
+  if (!q("#sc-taglie")) return;
   const mia = S.tagliaPer(profilo, c), scala = c.c === "scarpe" ? S.NUMERI_SCARPE : S.TAGLIE;
   if (e.taglie) {
     const ordine = [...e.taglie.keys()].sort((a, b) => scala.indexOf(a) - scala.indexOf(b));
-    corpo.querySelector("#sc-taglie").innerHTML = ordine.map(t => `<span class="${e.taglie.get(t).available ? "si" : "no"}${t === mia ? " mia" : ""}">${t}</span>`).join("") || "Non riesco a leggere le taglie: guarda sul sito.";
-    corpo.querySelector("#sc-ora").textContent = "ore " + new Date().toLocaleTimeString("it", { hour: "2-digit", minute: "2-digit" });
-    if (e.prezzoVivo != null && Math.abs(e.prezzoVivo - c.p) > 0.5) corpo.querySelector("#sc-prezzo").insertAdjacentHTML("beforeend", ` · <span class="male">ora ${Math.round(e.prezzoVivo)} sul sito</span>`);
-  } else corpo.querySelector("#sc-taglie").textContent = "";
-  corpo.querySelector("#sc-mia").innerHTML = mia || e.stato === "sparito" ? fraseTaglia(c, e) : "";
-  corpo.querySelector("#sc-sito").href = linkCapo(c, mia ? e : null);
-  if (sola) corpo.querySelector("#sc-metti")?.remove();
-  if (e.stato === "sparito") { corpo.querySelector("#sc-metti").remove(); corpo.querySelector("#sc-sito").remove(); }
+    q("#sc-taglie").innerHTML = ordine.map(t => `<span class="${e.taglie.get(t).available ? "si" : "no"}${t === mia ? " mia" : ""}">${t}</span>`).join("") || "Guarda le taglie sul sito.";
+    q("#sc-ora").textContent = "ore " + new Date().toLocaleTimeString("it", { hour: "2-digit", minute: "2-digit" });
+    if (e.prezzoVivo != null && Math.abs(e.prezzoVivo - c.p) > 0.5) q("#sc-prezzo").insertAdjacentHTML("beforeend", ` · <span class="male">ora ${Math.round(e.prezzoVivo)} sul sito</span>`);
+  } else q("#sc-taglie").textContent = "";
+  q("#sc-mia").innerHTML = mia || e.stato === "sparito" ? fraseTaglia(c, e) : "";
+  q("#sc-sito").href = linkCapo(c, mia ? e : null);
+  if (e.stato === "sparito") { q("#sc-metti")?.remove(); q("#sc-sito").remove(); }
 }
 
 // ======================================================================
@@ -435,25 +433,25 @@ async function apriScheda(c, livello = 1, sola = false) {   // sola = solo da gu
 // ======================================================================
 async function apriCompra() {
   const capi = S.capiDi(outfit);
-  const corpo = apriFoglio("Compra l'outfit", capi.map((c, i) => `<div class="acquisto"><img src="${foto(c, 140)}" alt="">
-      <div><span class="marca" style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)">${S.NOME_POSTO[S.postoDi(c)]} · ${esc(negozio(c).nome)}</span><br><b style="font-size:13px">${esc(c.t)}</b><br>
-        <span style="font-size:12px;color:var(--ink-2)">${prezzo(c)} · taglia ${S.tagliaPer(profilo, c)}</span>
-        <div class="stato" id="st-${i}">Controllo la taglia…</div>
-        ${negozio(c).ue ? "" : `<div class="stato male">Da fuori UE: possibili dazi e IVA alla consegna.</div>`}
+  const corpo = apriFoglio("Compra", capi.map((c, i) => `<div class="acquisto"><img src="${foto(c, 140)}" alt="">
+      <div><span class="marca" style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)">${esc(negozio(c).nome)}</span><br><b style="font-size:13px">${esc(c.t)}</b><br>
+        <span style="font-size:12px;color:var(--ink-2)">${prezzo(c)}</span>
+        <div class="stato" id="st-${i}">…</div>
+        ${negozio(c).ue ? "" : `<div class="stato male">Da fuori UE: possibili dazi alla consegna.</div>`}
         <a class="pieno" id="go-${i}" href="${linkCapo(c)}" target="_blank" rel="noopener">Compra su ${esc(negozio(c).dominio.replace(/^www\./, ""))} ↗</a></div></div>`).join("") +
     `<div class="totale"><span>Totale</span><span>${euro(S.totale(outfit))}</span></div>
-     <p class="note">Ogni capo si compra sul sito del suo marchio: si apre la pagina con la tua taglia già scelta. Spedizione e resi sono quelli di ciascun negozio. I prezzi non in euro sono un cambio indicativo.</p>`);
+     <p class="note">Ogni capo si compra sul sito del suo marchio, con la taglia già scelta. Spedizione e resi sono i loro.</p>`);
   capi.forEach(async (c, i) => {
     const e = await verifica(c), st = corpo.querySelector(`#st-${i}`); if (!st) return;
     st.innerHTML = fraseTaglia(c, e);
     const a = corpo.querySelector(`#go-${i}`);
     if (e.stato === "ok" || e.stato === "ignoto") a.href = linkCapo(c, e);
-    else { a.className = "vuoto"; a.removeAttribute("href"); a.removeAttribute("target"); a.textContent = "Cambia questo capo"; a.style.cursor = "pointer"; a.onclick = () => { chiudiFoglio(); apriCambia(S.postoDi(c)); }; }
+    else { a.className = "vuoto"; a.removeAttribute("href"); a.removeAttribute("target"); a.textContent = "Cambia"; a.style.cursor = "pointer"; a.onclick = () => apriCambia(S.postoDi(c)); }
   });
 }
 
 // ======================================================================
-// CERCA — per chi vuole un capo preciso
+// SCOPRI — sfogliare i capi per reparto, o cercarne uno preciso
 // ======================================================================
 const PAROLE_CAT = [
   ["scarpe", /\b(scarp|sneaker|stival|sandal|mocassin|ballerin|décolleté|decollete|tacchi|anfibi)/],
@@ -481,80 +479,90 @@ function capisci(testo) {
   q.negozio = DATI.negozi.findIndex(n => piano(n.nome).split(/[^a-z']+/).some(w => w.length > 2 && !VUOTE.includes(w) && new RegExp(`\\b${w}\\b`).test(t)));
   return q;
 }
-$("apri-cerca").onclick = () => {
-  let lista = [], mostrati = 0, soloTaglia = true;
-  const corpo = apriFoglio("Cerca un capo", `<form class="cerca" id="c-form"><input id="c-q" type="search" placeholder="cappotto nero sotto 300" autocomplete="off" aria-label="Cosa cerchi"><button aria-label="Cerca"><svg viewBox="0 0 24 24" width="17" height="17" stroke="currentColor" fill="none" stroke-width="1.5"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></button></form>
-    <div class="filtri"><button class="piccolo" id="c-taglia" aria-pressed="true">Solo nella mia taglia</button></div><div class="conta" id="c-conta">Scrivi un capo, un colore, un prezzo o un marchio.</div><div class="griglia" id="c-griglia"></div>`);
-  const carta = c => `<button class="carta" data-k="${esc(S.chiave(c))}"><img src="${foto(c)}" alt="" loading="lazy"><span class="marca">${esc(negozio(c).nome)}</span><b>${esc(c.t)}</b><small>${prezzo(c)}</small></button>`;
-  const altri = () => { corpo.querySelector(".altri")?.remove(); const l = lista.slice(mostrati, mostrati + 30); mostrati += l.length; $("c-griglia").insertAdjacentHTML("beforeend", l.map(carta).join("") + (mostrati < lista.length ? `<button class="vuoto altri">Mostra altri</button>` : "")); };
-  const cerca = () => {
-    const testo = $("c-q").value.trim(); if (!testo) return;
+const REPARTI = [["capospalla", "Giacche e cappotti"], ["sopra", "Sopra"], ["sotto", "Sotto"], ["abito", "Abiti", "d"], ["scarpe", "Scarpe"]];
+let reparto = "sopra", listaScopri = [], mostratiScopri = 0, soloTaglia = true;
+function scopri() {
+  const reparti = REPARTI.filter(r => !r[2] || r[2] === profilo.genere), testo = $("c-q").value.trim();
+  $("c-filtri").innerHTML = (testo ? "" : reparti.map(r => `<button class="piccolo" data-r="${r[0]}" aria-pressed="${r[0] === reparto}">${r[1]}</button>`).join("")) +
+    `<button class="piccolo" data-t="1" aria-pressed="${soloTaglia}">La mia taglia</button>`;
+  const vaBene = c => !esclusi.has(S.chiave(c)) && (!soloTaglia || S.haTaglia(c, profilo)) && !(profilo.genere === "u" && (c.c === "abito" || c.c === "gonna"));
+  if (testo) {
     const q = capisci(testo), ql = q.hex ? S.lab(q.hex) : null;
-    lista = DATI.capi.filter(c => (!q.cat || c.c === q.cat) && (q.negozio < 0 || c.n === q.negozio) && (!q.max || c.e <= q.max) && !esclusi.has(S.chiave(c))
-      && (!ql || (c.x && Math.hypot(...S.lab(c.x).map((v, i) => v - ql[i])) < 16)) && q.parole.every(w => TRADUCI[w].test(c.t.toLowerCase()))
-      && (!soloTaglia || S.haTaglia(c, profilo)) && !(profilo.genere === "u" && (c.c === "abito" || c.c === "gonna")));
     const capito = [q.cat, q.colore, ...q.parole.filter(w => w !== q.cat), q.negozio >= 0 ? DATI.negozi[q.negozio].nome : null, q.max ? `fino a ${euro(q.max)}` : null].filter(Boolean);
-    lista.sort((a, b) => (S.distPalette(a, profilo.stagione) ?? 50) - (S.distPalette(b, profilo.stagione) ?? 50));
-    $("c-conta").textContent = capito.length ? `Cerco: ${capito.join(" · ")} — ${lista.length.toLocaleString("it")} capi` : "Non ho capito. Prova con un capo (cappotto, jeans, stivali), un colore, un prezzo o un marchio.";
-    mostrati = 0; $("c-griglia").innerHTML = "";
-    if (!capito.length) { lista = []; return; }
-    if (!lista.length) $("c-griglia").innerHTML = `<p class="niente">Nessun capo così${soloTaglia ? " nella tua taglia" : ""}.</p>`; else altri();
-  };
-  $("c-form").onsubmit = e => { e.preventDefault(); $("c-q").blur(); cerca(); };
-  $("c-taglia").onclick = () => { soloTaglia = !soloTaglia; $("c-taglia").setAttribute("aria-pressed", soloTaglia); cerca(); };
-  corpo.onclick = e => { if (e.target.closest(".altri")) return altri(); const b = e.target.closest(".carta"); if (b) apriScheda(INDICE.get(b.dataset.k), 2); };
-  setTimeout(() => $("c-q").focus(), 300);
-};
+    listaScopri = !capito.length ? [] : DATI.capi.filter(c => vaBene(c) && (!q.cat || c.c === q.cat) && (q.negozio < 0 || c.n === q.negozio) && (!q.max || c.e <= q.max)
+      && (!ql || (c.x && Math.hypot(...S.lab(c.x).map((v, i) => v - ql[i])) < 16)) && q.parole.every(w => TRADUCI[w].test(c.t.toLowerCase())))
+      .sort((a, b) => (S.distPalette(a, profilo.stagione) ?? 50) - (S.distPalette(b, profilo.stagione) ?? 50));
+    $("c-conta").textContent = capito.length ? `${capito.join(" · ")} — ${listaScopri.length.toLocaleString("it")} capi` : "Prova con un capo, un colore, un prezzo o un marchio.";
+  } else {
+    // senza ricerca: i capi del reparto; con "la mia taglia", prima quelli che stanno bene col look di adesso
+    listaScopri = soloTaglia ? S.alternative(DATI.capi, ctx(), outfit, reparto, Infinity) : DATI.capi.filter(c => S.postoDi(c) === reparto && vaBene(c));
+    $("c-conta").textContent = `${listaScopri.length.toLocaleString("it")} capi${soloTaglia ? " nella tua taglia" : ""}`;
+  }
+  mostratiScopri = 0; $("c-griglia").innerHTML = ""; $("c-griglia").parentElement.scrollTop = 0;
+  if (!listaScopri.length) $("c-griglia").innerHTML = `<p class="niente">Niente${soloTaglia ? " nella tua taglia" : ""}.</p>`; else altriScopri();
+}
+function altriScopri() {
+  $("c-griglia").querySelector(".altri")?.remove();
+  const l = listaScopri.slice(mostratiScopri, mostratiScopri + 30); mostratiScopri += l.length;
+  $("c-griglia").insertAdjacentHTML("beforeend", l.map(c => `<button class="carta" data-k="${esc(S.chiave(c))}"><img src="${foto(c)}" alt="" loading="lazy"><span class="marca">${esc(negozio(c).nome)}</span><b>${esc(c.t)}</b><small>${prezzo(c)}</small></button>`).join("") + (mostratiScopri < listaScopri.length ? `<button class="vuoto altri">Altri</button>` : ""));
+}
+$("c-form").onsubmit = e => { e.preventDefault(); $("c-q").blur(); scopri(); };
+$("c-q").addEventListener("search", () => { if (!$("c-q").value) scopri(); });
+$("c-filtri").onclick = e => { const b = e.target.closest("button"); if (!b) return; if (b.dataset.r) reparto = b.dataset.r; else soloTaglia = !soloTaglia; scopri(); };
+$("c-griglia").onclick = e => { if (e.target.closest(".altri")) return altriScopri(); const b = e.target.closest(".carta"); if (b) apriScheda(INDICE.get(b.dataset.k)); };
 
 // ======================================================================
-// ADDOSSO — spiegazione onesta finché la prova non è accesa
+// I CAPI SULL'AVATAR — detto com'è finché non è acceso
 // ======================================================================
-function apriAddosso() {
-  apriFoglio("La prova addosso", `<div class="dettagli" style="gap:12px;font-size:14px">
-    <p style="margin:0">Qui vedrai l'outfit addosso a te, in una foto.</p>
-    <p style="margin:0"><b>Come funziona.</b> Carichi una tua foto in piedi, vestito, oppure scegli un modello che ti somiglia. Tocchi "Prova addosso" e in una quindicina di secondi arriva l'immagine con tutti i capi dell'outfit.</p>
-    <p style="margin:0"><b>Cosa mostra.</b> L'aspetto: colori, lunghezze, come stanno insieme i capi. Non dice se la taglia ti va: per quella valgono le guide del marchio.</p>
-    <p style="margin:0"><b>Perché non c'è ancora.</b> Ogni immagine ha un costo (pochi centesimi). La accendiamo appena è deciso come coprirlo.</p>
-    <p style="margin:0;color:var(--ink-2)">Nel frattempo "I capi" mostra le foto vere dei negozi, una per posto.</p>
-    <figure style="margin:6px 0 0"><img src="esempio-addosso.jpg" alt="Esempio: una modella con cappotto, maglione, pantaloni e sneakers" style="border:1px solid var(--riga)"><figcaption style="font-size:12px;color:var(--ink-3);margin-top:6px">Un esempio di come sarà l'immagine (capi dimostrativi).</figcaption></figure></div>`);
+function apriInfoProva() {
+  apriFoglio("I capi sull'avatar", `<div class="dettagli" style="gap:12px;font-size:14px">
+    <p style="margin:0">Tra poco l'avatar indosserà il look che componi. Per ora porta i capi base, e il look lo vedi nelle caselle a destra.</p>
+    <p style="margin:0">Potrai usare una tua foto, un modello che ti somiglia o un personaggio creato da te.</p>
+    <p style="margin:0;color:var(--ink-2)">L'immagine mostra come stanno insieme i capi. Per la taglia valgono le guide del marchio.</p>
+    <figure style="margin:6px 0 0"><img src="esempio-addosso.jpg" alt="Esempio: una modella con cappotto, maglione, pantaloni e sneakers" style="border:1px solid var(--riga)"><figcaption style="font-size:12px;color:var(--ink-3);margin-top:6px">Un esempio.</figcaption></figure></div>`);
 }
 
 // ======================================================================
-// CONDIVIDI — un link che apre questo outfit; chi lo riceve lo guarda, lo compra o lo prova nel suo camerino
+// CONDIVIDI — un link che apre questo look; chi lo riceve lo guarda, lo compra o lo prova nel suo camerino
 // ======================================================================
 const b64 = { su: t => btoa(String.fromCharCode(...new TextEncoder().encode(t))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
   giu: t => new TextDecoder().decode(Uint8Array.from(atob(t.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0))) };
-$("condividi").onclick = async () => {
-  const capi = S.capiDi(outfit); if (!capi.length) return toast("Non c'è ancora niente da condividere");
+async function condividi() {
+  const capi = S.capiDi(outfit); if (!capi.length) return;
   const url = `${location.origin}${location.pathname}?o=${b64.su(JSON.stringify({ g: profilo.genere, c: capi.map(S.chiave) }))}`;
-  const testo = `Guarda questo outfit: ${capi.length} capi, ${euro(S.totale(outfit))}`;
-  try {
-    if (navigator.share) await navigator.share({ title: "Camerino", text: testo, url });
-    else { await navigator.clipboard.writeText(url); toast("Link copiato: incollalo dove vuoi"); }
-  } catch (e) { if (e.name !== "AbortError") { try { await navigator.clipboard.writeText(url); toast("Link copiato: incollalo dove vuoi"); } catch { toast("Non riesco a condividere da questo browser"); } } }
-};
+  const copia = async () => { try { await navigator.clipboard.writeText(url); toast("Link copiato"); } catch { toast("Da questo browser non riesco a condividere"); } };
+  try { if (navigator.share) await navigator.share({ title: "Camerino", text: `Il mio look: ${capi.length} capi, ${euro(S.totale(outfit))}`, url }); else await copia(); }
+  catch (e) { if (e.name !== "AbortError") await copia(); }
+}
 function leggiCondiviso() {
   try { const o = JSON.parse(b64.giu(new URLSearchParams(location.search).get("o"))); return ["d", "u"].includes(o.g) && Array.isArray(o.c) && o.c.length <= 6 ? o : null; } catch { return null; }
 }
+/** La tavola dei capi (foto dei negozi nell'ordine del corpo), per il look ricevuto. */
+function tavola(o) {
+  const tess = (p, primo) => `<button class="tessera ${p}" data-apri="${p}" aria-label="${S.NOME_POSTO[p]}: ${esc(o[p].t)}"><img src="${foto(o[p], primo ? 500 : 360)}" alt=""><span>${S.NOME_POSTO[p]}</span></button>`;
+  const [primo, ...resto] = ["capospalla", "abito", "sopra", "sotto", "scarpe"].filter(p => o[p]);
+  return `<div class="tavola"${resto.length ? "" : ` style="grid-template-columns:1fr"`}>${tess(primo, true)}${resto.length ? `<div class="destra" style="grid-template-rows:${resto.map(p => p === "scarpe" && resto.length > 1 ? ".6fr" : "1fr").join(" ")}">${resto.map(p => tess(p)).join("")}</div>` : ""}</div>`;
+}
 async function apriCondiviso(link) {
   mostra("s-condiviso");
-  $("cond-palco").innerHTML = `<div class="addosso"><div class="solo-testo">Apro l'outfit…</div></div>`;
-  if (!await carica(link.g)) { $("cond-palco").innerHTML = `<div class="addosso"><div class="solo-testo">Non riesco a caricare l'outfit. Controlla la connessione e riapri il link.</div></div>`; return; }
+  const dice = t => { $("cond-palco").innerHTML = `<div class="solo-testo">${t}</div>`; };
+  dice("Un attimo…");
+  if (!await carica(link.g)) return dice("Non riesco a caricare il look. Controlla la connessione e riapri il link.");
   let o = S.outfitVuoto();
   const trovati = link.c.map(k => INDICE.get(k)).filter(Boolean);
   for (const c of trovati) o = S.metti(o, c).outfit;
   const proprio = () => { history.replaceState(null, "", location.pathname); if (profilo.pronto && profilo.genere) entra(); else apriProfilo(); };
   if (!trovati.length) {
-    $("cond-palco").innerHTML = `<div class="addosso"><div class="solo-testo">Questi capi non sono più in vendita.</div></div>`;
+    dice("Questi capi non sono più in vendita.");
     $("cond-posti").innerHTML = ""; $("cond-totale").innerHTML = ""; $("cond-nota").textContent = "";
     $("cond-prova").textContent = "Apri il camerino"; $("cond-prova").onclick = proprio; return;
   }
-  $("cond-palco").innerHTML = tavola(o, true);
+  $("cond-palco").innerHTML = tavola(o);
   $("cond-posti").innerHTML = S.capiDi(o).map(c => `<div class="posto"><button class="mini" data-k="${esc(S.chiave(c))}"><img src="${foto(c, 120)}" alt=""></button>
-    <button class="chi" data-k="${esc(S.chiave(c))}"><div class="nome-posto">${S.NOME_POSTO[S.postoDi(c)]} · ${esc(negozio(c).nome)}</div><div class="titolo">${esc(c.t)}</div><div class="riga2">${c.x ? `<span class="tono" style="background:${c.x}"></span>` : ""}${prezzo(c)}</div></button>
-    <div class="azioni"><a class="piccolo" style="display:grid;place-items:center;text-decoration:none" href="${linkCapo(c)}" target="_blank" rel="noopener">Sito ↗</a></div></div>`).join("");
+    <button class="chi" data-k="${esc(S.chiave(c))}"><div class="nome-posto">${esc(negozio(c).nome)}</div><div class="titolo">${esc(c.t)}</div><div class="riga2">${c.x ? `<span class="tono" style="background:${c.x}"></span>` : ""}${prezzo(c)}</div></button>
+    <a class="piccolo" style="display:grid;place-items:center;text-decoration:none" href="${linkCapo(c)}" target="_blank" rel="noopener">Sito ↗</a></div>`).join("");
   $("cond-totale").innerHTML = `<span>Totale</span><span>${euro(S.totale(o))}</span>`;
-  $("cond-nota").textContent = (trovati.length < link.c.length ? "Alcuni capi non sono più in vendita. " : "") + "Tocca un capo per vedere le taglie disponibili adesso.";
+  $("cond-nota").textContent = trovati.length < link.c.length ? "Qualche capo non è più in vendita." : "";
   const apri = e => { const b = e.target.closest("[data-k],[data-apri]"); if (!b) return; const c = b.dataset.k ? INDICE.get(b.dataset.k) : o[b.dataset.apri]; if (c) apriScheda(c, 1, true); };
   $("cond-posti").onclick = apri; $("cond-palco").onclick = apri;
   const altroGenere = profilo.pronto && profilo.genere !== link.g;

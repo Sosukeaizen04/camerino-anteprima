@@ -72,33 +72,50 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 .piede { position: sticky; bottom: 0; background: var(--carta); padding-block: 14px max(14px, env(safe-area-inset-bottom, 0px)); margin-top: auto; display: grid; gap: 10px; }
 .piede .pieno { width: 100%; justify-content: space-between; }
 
-/* ---------- camerino ---------- */
+/* ---------- camerino: l'avatar a tutto schermo ---------- */
 .testa { flex: none; display: flex; align-items: center; justify-content: space-between; padding-block: 10px 6px; }
 .logo { font: 400 23px var(--titolo); }
-.testa nav { display: flex; gap: 6px; }
 .budget { flex: none; padding-bottom: 8px; }
 .budget .cifre { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--ink-2); }
 .budget .cifre b { font-size: 16px; color: var(--ink); }
-.budget .barra { height: 4px; background: var(--riga); margin-top: 5px; }
+.budget .barra { height: 3px; background: var(--riga); margin-top: 5px; }
 .budget .barra i { display: block; height: 100%; background: var(--ink); max-width: 100%; transition: width .25s; }
 .budget.sfora .barra i { background: var(--rosso); }
 .budget.sfora .resto { color: var(--rosso); }
+.palco { flex: 1; min-height: 0; position: relative; overflow: hidden; background: var(--carta); touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab; }
+.palco.gira { cursor: grabbing; }
+.palco .avatar { position: absolute; inset: 0 0 18px 0; width: 100%; height: calc(100% - 18px); object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
+.palco .avatar.specchio { transform: scaleX(-1); }
+.punti { position: absolute; left: 0; right: 0; bottom: 4px; display: flex; gap: 5px; justify-content: center; }
+.punti i { width: 5px; height: 5px; border-radius: 50%; background: var(--riga); }
+.punti i.ora { background: var(--ink); }
+.pillola { position: absolute; left: max(20px, env(safe-area-inset-left, 0px)); top: 6px; font-size: 11px; color: var(--ink-2); background: var(--carta); border: 1px solid var(--riga); padding: 4px 8px; }
+.colonna { position: absolute; right: max(14px, env(safe-area-inset-right, 0px)); top: 6px; bottom: 26px; display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+.casella { position: relative; width: 62px; height: 78px; border: 1px solid var(--riga); background: var(--velo); overflow: hidden; }
+.casella img { width: 100%; height: 100%; object-fit: cover; object-position: center top; pointer-events: none; }
+.casella.scarpe img { object-fit: contain; object-position: center; }
+.casella small { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,.92); font-size: 8.5px; letter-spacing: .08em; text-transform: uppercase; text-align: center; padding: 2px 0; }
+.casella.libera { border-style: dashed; border-color: var(--ink-3); display: grid; place-items: center; font-size: 22px; color: var(--ink-3); background: var(--carta); }
+.casella .lucchetto { position: absolute; top: 3px; right: 3px; width: 16px; height: 16px; background: var(--ink); color: var(--carta); display: grid; place-items: center; }
+.casella .lucchetto svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 2; }
+.attrezzi { position: absolute; left: max(20px, env(safe-area-inset-left, 0px)); bottom: 26px; display: grid; gap: 6px; }
+.attrezzi .icona { background: var(--carta); }
+.attrezzi .icona[aria-pressed="true"] svg { fill: currentColor; }
+.avviso { flex: none; margin: 0; padding: 8px 0 0; font-size: 13px; }
+.azioni { flex: none; display: grid; grid-template-columns: 1fr 1.35fr; gap: 6px; padding-block: 8px; }
+.azioni .pieno, .azioni .vuoto { font-size: 14px; white-space: nowrap; padding: 0 8px; }
+.schede { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--ink); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.schede button { height: 50px; font-size: 13px; color: var(--ink-3); }
+.schede button[aria-current="page"] { color: var(--ink); font-weight: 700; }
 .corpo { flex: 1; min-height: 0; overflow-y: auto; }
-.viste { display: flex; gap: 6px; margin-bottom: 8px; }
-.palco { position: relative; height: min(46vh, 400px); background: var(--velo); border: 1px solid var(--riga); }
 .tavola { position: absolute; inset: 0; display: grid; grid-template-columns: 1.15fr 1fr; gap: 2px; background: var(--carta); }
 .tavola .destra { display: grid; gap: 2px; min-height: 0; }
 .tessera { position: relative; min-height: 0; overflow: hidden; background: var(--velo); width: 100%; height: 100%; text-align: left; }
 .tessera img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center top; }
 .tessera.scarpe img { object-fit: contain; object-position: center; }
 .tessera span { position: absolute; left: 6px; bottom: 6px; background: var(--carta); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; padding: 2px 6px; }
-.tessera.manca { display: grid; place-items: center; text-align: center; border: 1px dashed var(--ink-3); color: var(--ink-2); font-size: 12px; padding: 8px; }
-.tessera.manca b { display: block; font-size: 13px; color: var(--ink); }
-.addosso { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--carta); }
-.addosso img { flex: 1; min-height: 0; width: 100%; object-fit: contain; }
-.addosso .dice { flex: none; padding: 10px 12px; border-top: 1px solid var(--riga); font-size: 12px; color: var(--ink-2); display: flex; gap: 10px; align-items: center; justify-content: space-between; }
-.addosso .solo-testo { flex: 1; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--ink-2); font-size: 14px; }
-.avviso { margin: 10px 0 0; padding: 10px 12px; border: 1px solid var(--ink); font-size: 13px; }
+.riquadro { position: relative; height: min(46vh, 400px); background: var(--velo); border: 1px solid var(--riga); }
+.riquadro .solo-testo { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--ink-2); font-size: 14px; }
 .posti { margin-top: 6px; }
 .posto { display: grid; grid-template-columns: 48px 1fr auto; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--riga); }
 .posto .mini { width: 48px; height: 60px; background: var(--velo); border: 1px solid var(--riga); overflow: hidden; }
@@ -107,15 +124,12 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 .posto .nome-posto { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .posto .titolo { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .posto .riga2 { font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.posto .azioni { display: flex; gap: 5px; }
-.posto.vuoto-posto .titolo { font-weight: 400; color: var(--ink-2); }
 .tono { display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 1px solid rgba(0,0,0,.18); margin-right: 3px; }
 .bene { color: var(--verde); } .male { color: var(--rosso); }
-.fondo .pieno, .fondo .vuoto { font-size: 14px; white-space: nowrap; padding: 0 8px; }
-.fondo { flex: none; display: grid; grid-template-columns: 1fr 1.3fr 52px; gap: 6px; padding-block: 10px max(10px, env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--ink); }
-.fondo .icona { width: 52px; height: 52px; border-color: var(--ink); }
-.fondo .icona[aria-pressed="true"] svg { fill: currentColor; }
+.fondo { flex: none; padding-block: 10px max(10px, env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--ink); }
 .note { font-size: 11px; color: var(--ink-3); margin: 10px 0 14px; }
+.tre { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tre .piccolo { height: 40px; font-size: 13px; }
 
 /* ---------- foglio (scheda, cambia, compra, cerca, salvati) ---------- */
 .foglio { position: absolute; inset: 0; background: var(--carta); z-index: 20; display: flex; flex-direction: column; transform: translateY(100%); transition: transform .28s ease; visibility: hidden; }
@@ -160,7 +174,7 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 .salvato .strip img { width: 54px; height: 70px; object-fit: cover; object-position: center top; border: 1px solid var(--riga); }
 .salvato .sotto-strip { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
 
-.toast { position: absolute; left: 50%; bottom: 86px; transform: translate(-50%, 16px); background: var(--ink); color: var(--carta); font-size: 13px; padding: 9px 14px; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; z-index: 40; display: flex; gap: 14px; align-items: center; max-width: calc(100% - 32px); }
+.toast { position: absolute; left: 50%; bottom: 128px; transform: translate(-50%, 16px); background: var(--ink); color: var(--carta); font-size: 13px; padding: 9px 14px; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; z-index: 40; display: flex; gap: 14px; align-items: center; max-width: calc(100% - 32px); }
 .toast.su { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 .toast button { color: var(--carta); text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .foglio, .toast, .budget .barra i { transition: none; } }
@@ -174,46 +188,49 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
     <div class="passo lati" id="passo"></div>
   </section>
 
-  <!-- camerino: la casa dell'app -->
+  <!-- camerino: l'avatar a tutto schermo, i capi di fianco -->
   <section class="schermo" id="s-camerino" hidden>
     <header class="testa lati">
       <span class="logo">camerino</span>
-      <nav>
-        <button class="icona" id="apri-cerca" aria-label="Cerca un capo"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></button>
-        <button class="icona" id="apri-salvati" aria-label="Outfit salvati"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.600-7 10-7 10z"/></svg></button>
-        <button class="icona" id="apri-profilo" aria-label="Taglie, colori e budget"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.500-4 4.500-6 8-6s6.500 2 8 6"/></svg></button>
-      </nav>
+      <button class="icona" id="apri-profilo" aria-label="Taglie, colori e budget"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></button>
     </header>
     <div class="budget lati" id="budget"></div>
-    <div class="corpo lati">
-      <div class="viste" role="tablist">
-        <button class="piccolo" id="vista-capi" aria-pressed="true">I capi</button>
-        <button class="piccolo" id="vista-addosso" aria-pressed="false">Addosso</button>
-        <button class="piccolo" id="condividi" style="margin-left:auto">Condividi</button>
-      </div>
-      <div class="palco" id="palco"></div>
-      <div id="avviso"></div>
-      <div class="posti" id="posti"></div>
-      <p class="note">Ogni capo si compra sul sito del suo marchio. Prezzi e taglie sono controllati lì quando apri o componi un outfit.</p>
-    </div>
-    <div class="fondo lati">
-      <button class="vuoto" id="altro">Altro outfit</button>
+    <div class="palco" id="palco"></div>
+    <p class="avviso lati" id="avviso" hidden></p>
+    <div class="azioni lati">
+      <button class="vuoto" id="altro">Nuovo look</button>
       <button class="pieno" id="principale">Compra</button>
-      <button class="icona" id="salva" aria-label="Salva questo outfit" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.600-7 10-7 10z"/></svg></button>
     </div>
   </section>
 
-  <!-- outfit ricevuto da un link -->
+  <!-- scopri: sfogliare e cercare i capi -->
+  <section class="schermo" id="s-scopri" hidden>
+    <header class="testa lati"><span class="logo">scopri</span></header>
+    <div class="lati" style="flex:none">
+      <form class="cerca" id="c-form"><input id="c-q" type="search" placeholder="cappotto nero sotto 300" autocomplete="off" aria-label="Cerca un capo"><button aria-label="Cerca"><svg viewBox="0 0 24 24" width="17" height="17" stroke="currentColor" fill="none" stroke-width="1.5"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></button></form>
+      <div class="filtri" id="c-filtri"></div>
+      <div class="conta" id="c-conta"></div>
+    </div>
+    <div class="corpo lati"><div class="griglia" id="c-griglia" style="padding-bottom:16px"></div></div>
+  </section>
+
+  <nav class="schede" id="schede" hidden>
+    <button data-s="camerino" aria-current="page">Camerino</button>
+    <button data-s="scopri">Scopri</button>
+    <button data-s="salvati">Salvati</button>
+  </nav>
+
+  <!-- look ricevuto da un link -->
   <section class="schermo" id="s-condiviso" hidden>
     <header class="testa lati"><span class="logo">camerino</span></header>
     <div class="corpo lati">
-      <p class="dove" style="margin:0 0 8px">Un outfit condiviso con te</p>
-      <div class="palco" id="cond-palco"></div>
+      <p class="dove" style="margin:0 0 8px">Un look per te</p>
+      <div class="riquadro" id="cond-palco"></div>
       <div class="posti" id="cond-posti"></div>
       <div class="totale" id="cond-totale"></div>
       <p class="note" id="cond-nota"></p>
     </div>
-    <div class="fondo lati" style="grid-template-columns:1fr"><button class="pieno" id="cond-prova"></button></div>
+    <div class="fondo lati"><button class="pieno" id="cond-prova" style="width:100%"></button></div>
   </section>
 
   <div class="foglio" id="foglio" aria-hidden="true">

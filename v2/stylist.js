@@ -3,7 +3,7 @@
 export const TAGLIE = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL"];
 export const NUMERI_SCARPE = [35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47];
 export const POSTI = ["capospalla", "sopra", "sotto", "scarpe"];
-export const NOME_POSTO = { capospalla: "Capospalla", sopra: "Sopra", sotto: "Sotto", scarpe: "Scarpe", abito: "Abito" };
+export const NOME_POSTO = { capospalla: "Giacca", sopra: "Sopra", sotto: "Sotto", scarpe: "Scarpe", abito: "Abito" };
 
 const POSTO_DI = { top: "sopra", camicia: "sopra", maglia: "sopra", pantaloni: "sotto", jeans: "sotto", gonna: "sotto",
   abito: "abito", capospalla: "capospalla", scarpe: "scarpe" };
