@@ -40,22 +40,29 @@ function mostra(id) {
 }
 
 // ---------- avvisi brevi, con "Annulla" ----------
-function toast(testo, annulla) {
+function toast(testo, annulla, pulsante = "Annulla") {
   const el = $("toast");
-  el.innerHTML = `<span>${esc(testo)}</span>` + (annulla ? `<button>Annulla</button>` : "");
+  el.innerHTML = `<span>${esc(testo)}</span>` + (annulla ? `<button>${esc(pulsante)}</button>` : "");
   if (annulla) el.querySelector("button").onclick = () => { el.classList.remove("su"); annulla(); };
   el.classList.add("su"); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("su"), annulla ? 5000 : 2400);
 }
 
 // ---------- fogli ----------
+let alChiudere = null;     // cosa fare quando si chiude il foglio principale (comunque si chiuda)
 function apriFoglio(titolo, html, livello = 1) {
   const f = $(livello === 2 ? "foglio2" : "foglio");
+  if (livello === 1) alChiudere = null;
   $(f.id + "-titolo").textContent = titolo;
   const corpo = $(f.id + "-corpo"); corpo.innerHTML = html; corpo.scrollTop = 0; corpo.onclick = null;
   f.classList.add("aperto"); f.setAttribute("aria-hidden", "false");
   return corpo;
 }
-function chiudiFoglio(livello = 1) { const f = $(livello === 2 ? "foglio2" : "foglio"); f.classList.remove("aperto"); f.setAttribute("aria-hidden", "true"); }
+function chiudiFoglio(livello = 1) {
+  const f = $(livello === 2 ? "foglio2" : "foglio");
+  const aperto = f.classList.contains("aperto");
+  f.classList.remove("aperto"); f.setAttribute("aria-hidden", "true");
+  if (livello === 1 && aperto && alChiudere) { const fai = alChiudere; alChiudere = null; fai(); }
+}
 $("foglio-chiudi").onclick = () => chiudiFoglio(1);
 $("foglio2-chiudi").onclick = () => chiudiFoglio(2);
 document.addEventListener("keydown", e => { if (e.key === "Escape") { if ($("foglio2").classList.contains("aperto")) chiudiFoglio(2); else chiudiFoglio(1); } });
@@ -143,7 +150,60 @@ function disegnaPasso() {
   $("passo").scrollTop = 0;
 }
 function apriProfilo() { daProfilo = profilo.pronto; passo = 0; mostra("s-profilo"); disegnaPasso(); }
-$("apri-profilo").onclick = apriProfilo;
+
+// ======================================================================
+// IL MIO ACCOUNT — si guarda e si modifica sul posto; la ✕ riporta dove eri
+// ======================================================================
+function apriAccount(prima = JSON.stringify(profilo)) {
+  const scelte = (campo, valori, attuale) => `<div class="scelte" data-campo="${campo}">${valori.map(v => `<button data-v="${v}" aria-pressed="${String(attuale) === String(v)}">${v}</button>`).join("")}</div>`;
+  const numeri = profilo.genere === "u" ? S.NUMERI_SCARPE.filter(n => n >= 39) : S.NUMERI_SCARPE.filter(n => n <= 42);
+  const corpo = apriFoglio("Il mio account", `
+    <div class="campo" style="border-top:0"><div class="etichetta"><span>Capi da</span></div>
+      <div class="scelte" data-campo="genere"><button data-v="d" aria-pressed="${profilo.genere === "d"}">Donna</button><button data-v="u" aria-pressed="${profilo.genere === "u"}">Uomo</button></div></div>
+    <div class="campo"><div class="etichetta"><span>Taglia sopra</span></div>${scelte("tagliaSopra", S.TAGLIE, profilo.tagliaSopra)}</div>
+    <div class="campo"><div class="etichetta"><span>Taglia sotto</span></div>${scelte("tagliaSotto", S.TAGLIE, profilo.tagliaSotto)}</div>
+    <div class="campo"><div class="etichetta"><span>Scarpe</span></div>${scelte("scarpa", numeri, profilo.scarpa)}</div>
+    <div class="campo"><div class="etichetta"><span>Budget del look</span><output id="a-o-budget">${euro(profilo.budget)}</output></div>
+      <input type="range" id="a-budget" min="100" max="3000" step="50" value="${profilo.budget}" aria-label="Budget del look in euro">
+      <label class="interruttore"><input type="checkbox" id="a-capospalla" ${profilo.conCapospalla ? "checked" : ""}> Con giacca o cappotto</label></div>
+    <div class="campo"><div class="etichetta"><span>Colori</span><span>${profilo.stagione ? "" : "nessuna stagione"}</span></div>
+      <div class="stagioni" data-campo="stagione">${Object.entries(S.STAGIONI).map(([k, st]) => `<button class="stagione" data-v="${k}" aria-pressed="${profilo.stagione === k}"><span><b>${st.nome}</b><small>${st.desc}</small></span><span class="pallini">${st.colori.map(c => `<i style="background:${c}"></i>`).join("")}</span></button>`).join("")}</div></div>
+    <div class="campo"><div class="etichetta"><span>Stile</span></div>
+      <div class="scelte" data-campo="stili">${S.STILI.map(k => `<button data-v="${k}" aria-pressed="${profilo.stili.includes(k)}">${k}</button>`).join("")}</div></div>
+    <div class="campo"><div class="etichetta"><span>Salvati</span><span>${salvati.length}</span></div>
+      <button class="vuoto" id="a-salvati">Vedi i look salvati</button></div>
+    <div class="campo"><button class="testo-link" id="a-azzera" style="justify-self:start">Cancella tutto e ricomincia</button></div>`);
+  corpo.onclick = e => {
+    if (e.target.closest("#a-salvati")) { chiudiFoglio(); return apriSalvati(); }
+    if (e.target.closest("#a-azzera")) {
+      if (!corpo.querySelector("#a-azzera").dataset.sicuro) { corpo.querySelector("#a-azzera").dataset.sicuro = 1; corpo.querySelector("#a-azzera").textContent = "Tocca di nuovo per cancellare profilo, look e salvati"; return; }
+      try { localStorage.removeItem(CHIAVE); } catch {}
+      location.replace(location.pathname); return;
+    }
+    const b = e.target.closest("[data-campo] button"); if (!b) return;
+    const gruppo = b.parentElement, campo = gruppo.dataset.campo, v = b.dataset.v;
+    if (campo === "stili") { profilo.stili = profilo.stili.includes(v) ? profilo.stili.filter(x => x !== v) : [...profilo.stili, v]; b.setAttribute("aria-pressed", profilo.stili.includes(v)); return; }
+    if (campo === "stagione") { profilo.stagione = profilo.stagione === v ? null : v; for (const x of gruppo.children) x.setAttribute("aria-pressed", x.dataset.v === profilo.stagione); return; }
+    if (campo === "genere" && v !== profilo.genere) { profilo.genere = v; profilo.scarpa = null; alChiudere = null; return apriAccount(prima); }   // ridisegna: cambiano i numeri delle scarpe
+    profilo[campo] = campo === "scarpa" ? +v : v;
+    for (const x of gruppo.children) x.setAttribute("aria-pressed", x === b);
+  };
+  corpo.querySelector("#a-budget").oninput = e => { profilo.budget = +e.target.value; corpo.querySelector("#a-o-budget").textContent = euro(profilo.budget); };
+  corpo.querySelector("#a-capospalla").onchange = e => { profilo.conCapospalla = e.target.checked; };
+  // alla chiusura: si salva e il camerino si aggiorna; se è cambiato il genere si riparte con un look nuovo
+  alChiudere = () => {
+    if (!profilo.scarpa) { daProfilo = false; passo = 1; mostra("s-profilo"); disegnaPasso(); outfit = S.outfitVuoto(); bloccati.clear(); DATI = null; return; }   // ha cambiato genere senza scegliere il numero
+    if (JSON.stringify(profilo) === prima) return;
+    const cambiatoGenere = JSON.parse(prima).genere !== profilo.genere;
+    ricorda();
+    if (cambiatoGenere) { outfit = S.outfitVuoto(); bloccati.clear(); vistaAvatar = 0; DATI = null; return entra(); }
+    if (!$("s-camerino").hidden) disegna();
+    const fuori = S.capiDi(outfit).filter(c => !S.haTaglia(c, profilo));
+    toast(fuori.length ? `${fuori.length === 1 ? "Un capo non c'è" : `${fuori.length} capi non ci sono`} nella nuova taglia` : "Salvato");
+    if (fuori.length) setTimeout(() => toast("Rifaccio il look con le nuove taglie?", () => { for (const c of fuori) bloccati.delete(S.postoDi(c)); componi(false); }, "Sì"), 2600);
+  };
+}
+$("apri-profilo").onclick = () => apriAccount();
 
 // ======================================================================
 // CAMERINO — l'avatar a tutto schermo, i capi del look di fianco
