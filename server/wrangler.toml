@@ -4,8 +4,10 @@ main = "worker.js"
 compatibility_date = "2026-10-01"
 
 [vars]
-MODELLO = "google/nano-banana-2.1/edit"
+MODELLO = "google/nano-banana-2.1/edit"     # modifica di immagini (prova addosso, avatar da foto)
+MODELLO_TESTO = "google/nano-banana-2.1"    # immagini da testo (personaggio inventato)
 LIMITE_PERSONA = "15"     # prove al giorno per persona
+LIMITE_AVATAR = "15"      # avatar al giorno per persona (alto finché lo usano solo Emanuele e Andrea)
 LIMITE_GIORNO = "120"     # prove al giorno in tutto (~5 € al giorno al massimo)
 ORIGINI = "https://sosukeaizen04.github.io,http://localhost:8765"
 BASE_AVATAR = "https://sosukeaizen04.github.io/camerino-anteprima/img/avatar_"

@@ -9,7 +9,7 @@ const mesiFreddi = () => { const m = new Date().getMonth(); return m >= 9 || m <
 // ---------- stato ----------
 const CHIAVE = "camerino-v2";
 const salvato = (() => { try { return JSON.parse(localStorage.getItem(CHIAVE)) || {}; } catch { return {}; } })();
-const profilo = Object.assign({ genere: null, tagliaSopra: null, tagliaSotto: null, scarpa: null, stagione: null, budget: 400, stili: [], conCapospalla: mesiFreddi(), pronto: false }, salvato.profilo);
+const profilo = Object.assign({ avatar: null, avatari: [], genere: null, tagliaSopra: null, tagliaSotto: null, scarpa: null, stagione: null, budget: 400, stili: [], conCapospalla: mesiFreddi(), pronto: false }, salvato.profilo);
 profilo.freddo = mesiFreddi();            // la stagione viene dal calendario; "conCapospalla" dice solo se vuole la giacca
 let outfit = S.outfitVuoto();
 let bloccati = new Set(salvato.bloccati || []);
@@ -23,18 +23,18 @@ const SERVER = (() => { try { return localStorage.getItem("camerino-server"); } 
 const BASE_AVATAR = "https://sosukeaizen04.github.io/camerino-anteprima/img/";
 const prove = (() => { try { return JSON.parse(localStorage.getItem(CHIAVE + "-prove")) || {}; } catch { return {}; } })();   // look → immagine
 let vestito = true, inCorso = null;          // vestito = mostra l'avatar col look quando c'è; inCorso = look che si sta vestendo
-const chiaveLook = () => profilo.genere + "|" + S.capiDi(outfit).map(S.chiave).join("+");
+const chiaveLook = () => profilo.genere + "|" + (profilo.avatar?.url || "") + "|" + S.capiDi(outfit).map(S.chiave).join("+");
 function ricordaProve() {
   const k = Object.keys(prove); for (const x of k.slice(0, Math.max(0, k.length - 60))) delete prove[x];    // le ultime 60 bastano
   try { localStorage.setItem(CHIAVE + "-prove", JSON.stringify(prove)); } catch {}
 }
 async function provaLook() {
   if (!SERVER || inCorso || S.mancanti(outfit).length) return;
-  const k = chiaveLook(), front = viste()[0][0];
+  const k = chiaveLook();
   inCorso = k; disegnaPalco();
   try {
     const r = await fetch(SERVER + "/prova", { method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ avatar: `${BASE_AVATAR}${front}.jpg`, capi: S.capiDi(outfit).map(c => ({ posto: S.postoDi(c), url: "https://cdn.shopify.com/s/files/" + c.i.slice(1) })) }) });
+      body: JSON.stringify({ avatar: avatarPerServer(), capi: S.capiDi(outfit).map(c => ({ posto: S.postoDi(c), url: "https://cdn.shopify.com/s/files/" + c.i.slice(1) })) }) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.url) throw new Error(d.messaggio || "Non sono riuscito a vestire l'avatar. Riprova.");
     await new Promise((ok, ko) => { const im = new Image(); im.onload = ok; im.onerror = ko; im.src = d.url; });    // pronta prima di mostrarla
@@ -197,11 +197,14 @@ function apriAccount(prima = JSON.stringify(profilo)) {
       <div class="stagioni" data-campo="stagione">${Object.entries(S.STAGIONI).map(([k, st]) => `<button class="stagione" data-v="${k}" aria-pressed="${profilo.stagione === k}"><span><b>${st.nome}</b><small>${st.desc}</small></span><span class="pallini">${st.colori.map(c => `<i style="background:${c}"></i>`).join("")}</span></button>`).join("")}</div></div>
     <div class="campo"><div class="etichetta"><span>Stile</span></div>
       <div class="scelte" data-campo="stili">${S.STILI.map(k => `<button data-v="${k}" aria-pressed="${profilo.stili.includes(k)}">${k}</button>`).join("")}</div></div>
+    <div class="campo"><div class="etichetta"><span>Avatar</span><span>${avatarScelto() ? avatarScelto().nome : "base"}</span></div>
+      <button class="vuoto" id="a-avatar">Cambia avatar</button></div>
     <div class="campo"><div class="etichetta"><span>Salvati</span><span>${salvati.length}</span></div>
       <button class="vuoto" id="a-salvati">Vedi i look salvati</button></div>
     <div class="campo"><button class="testo-link" id="a-azzera" style="justify-self:start">Cancella tutto e ricomincia</button></div>`);
   corpo.onclick = e => {
     if (e.target.closest("#a-salvati")) { chiudiFoglio(); return apriSalvati(); }
+    if (e.target.closest("#a-avatar")) { chiudiFoglio(); return apriAvatar(); }
     if (e.target.closest("#a-azzera")) {
       if (!corpo.querySelector("#a-azzera").dataset.sicuro) { corpo.querySelector("#a-azzera").dataset.sicuro = 1; corpo.querySelector("#a-azzera").textContent = "Tocca di nuovo per cancellare profilo, look e salvati"; return; }
       try { localStorage.removeItem(CHIAVE); } catch {}
@@ -288,11 +291,15 @@ async function componi(avvisa = true) {
 
 const LUCCHETTO = `<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`;
 const CUORE = `<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>`;
+const FIGURA = `<svg viewBox="0 0 24 24"><circle cx="12" cy="6" r="3"/><path d="M12 9v7M8 12h8M12 16l-3 5M12 16l3 5"/></svg>`;
 const MANDA = `<svg viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M5 13v6h14v-6"/></svg>`;
-/** Le viste dell'avatar base: [file, a specchio]. Si gira trascinando. */
-const viste = () => profilo.genere === "u"
-  ? [["avatar_uomo_front", 0], ["avatar_uomo_side", 0], ["avatar_uomo_side", 1]]
-  : [["avatar_front", 0], ["avatar_side", 0], ["avatar_back", 0], ["avatar_side", 1]];
+/** Le viste dell'avatar: [indirizzo, a specchio]. Quello base si gira trascinando; un avatar scelto o creato ha una vista sola. */
+const avatarScelto = () => profilo.avatar && profilo.avatar.genere === profilo.genere ? profilo.avatar : null;
+const viste = () => avatarScelto() ? [[avatarScelto().url, 0]] : profilo.genere === "u"
+  ? [["../img/avatar_uomo_front.jpg", 0], ["../img/avatar_uomo_side.jpg", 0], ["../img/avatar_uomo_side.jpg", 1]]
+  : [["../img/avatar_front.jpg", 0], ["../img/avatar_side.jpg", 0], ["../img/avatar_back.jpg", 0], ["../img/avatar_side.jpg", 1]];
+/** L'indirizzo pubblico dell'avatar di fronte, quello che riceve il server. */
+const avatarPerServer = () => avatarScelto()?.url || BASE_AVATAR + (profilo.genere === "u" ? "avatar_uomo_front.jpg" : "avatar_front.jpg");
 
 function disegna() {
   // budget: un'informazione, non un pulsante
@@ -337,15 +344,15 @@ function disegnaPalco(messaggio) {
   }).join("");
   const giaSalvato = salvati.some(s => s.capi.join() === S.capiDi(outfit).map(S.chiave).join());
   $("palco").innerHTML = (conLook ? `<img class="avatar" src="${esc(foto_)}" alt="L'avatar con il look" draggable="false">`
-      : `<img class="avatar${specchio ? " specchio" : ""}${inCorso === k ? " attesa" : ""}" src="../img/${file}.jpg" alt="Avatar" draggable="false">`) + `
+      : `<img class="avatar${specchio ? " specchio" : ""}${inCorso === k ? " attesa" : ""}" src="${esc(file)}" alt="Avatar" draggable="false">`) + `
     ${pillola}
     <div class="colonna">${caselle}</div>
-    <div class="attrezzi"><button class="icona" id="salva" aria-label="Salva questo look" aria-pressed="${giaSalvato}">${CUORE}</button><button class="icona" id="condividi" aria-label="Condividi questo look">${MANDA}</button></div>
-    ${conLook ? "" : `<div class="punti">${vv.map((_, i) => `<i class="${i === vistaAvatar % vv.length ? "ora" : ""}"></i>`).join("")}</div>`}`;
+    <div class="attrezzi"><button class="icona" id="salva" aria-label="Salva questo look" aria-pressed="${giaSalvato}">${CUORE}</button><button class="icona" id="condividi" aria-label="Condividi questo look">${MANDA}</button><button class="icona" id="cambia-avatar" aria-label="Cambia avatar">${FIGURA}</button></div>
+    ${conLook || vv.length < 2 ? "" : `<div class="punti">${vv.map((_, i) => `<i class="${i === vistaAvatar % vv.length ? "ora" : ""}"></i>`).join("")}</div>`}`;
 }
 // girare l'avatar trascinando; un tocco fermo sulle caselle le apre
 let presa = null;
-$("palco").addEventListener("pointerdown", e => { if (e.target.closest("button") || (vestito && prove[chiaveLook()])) return; presa = { x: e.clientX, passi: 0 }; $("palco").classList.add("gira"); $("palco").setPointerCapture(e.pointerId); });
+$("palco").addEventListener("pointerdown", e => { if (e.target.closest("button") || (vestito && prove[chiaveLook()]) || viste().length < 2) return; presa = { x: e.clientX, passi: 0 }; $("palco").classList.add("gira"); $("palco").setPointerCapture(e.pointerId); });
 $("palco").addEventListener("pointermove", e => {
   if (!presa) return;
   const passi = Math.trunc((e.clientX - presa.x) / 55);
@@ -360,6 +367,7 @@ $("palco").addEventListener("click", e => {
   else if (b.id === "condividi") condividi();
   else if (b.id === "info-prova") apriInfoProva();
   else if (b.id === "prova") provaLook();
+  else if (b.id === "cambia-avatar") apriAvatar();
   else if (b.id === "vista-look") { vestito = !vestito; vistaAvatar = 0; disegnaPalco(); }
 });
 $("altro").onclick = () => componi(true);
@@ -606,6 +614,96 @@ $("c-form").onsubmit = e => { e.preventDefault(); $("c-q").blur(); scopri(); };
 $("c-q").addEventListener("search", () => { if (!$("c-q").value) scopri(); });
 $("c-filtri").onclick = e => { const b = e.target.closest("button"); if (!b) return; if (b.dataset.r) reparto = b.dataset.r; else soloTaglia = !soloTaglia; scopri(); };
 $("c-griglia").onclick = e => { if (e.target.closest(".altri")) return altriScopri(); const b = e.target.closest(".carta"); if (b) apriScheda(INDICE.get(b.dataset.k)); };
+
+// ======================================================================
+// IL TUO AVATAR — modelli pronti, dalla tua foto, personaggio inventato
+// ======================================================================
+const MODELLI = { d: [["avatar_front", "Base"], ["avatar_mod_d1", "Modello 1"], ["avatar_mod_d2", "Modello 2"], ["avatar_mod_d3", "Modello 3"]],
+  u: [["avatar_uomo_front", "Base"], ["avatar_mod_u1", "Modello 1"], ["avatar_mod_u2", "Modello 2"], ["avatar_mod_u3", "Modello 3"]] };
+const OPZ = {
+  tipo: [["umano", "Umano"], ["alieno", "Alieno"], ["animale", "Animale"], ["robot", "Robot"], ["elfo", "Elfo"]],
+  animale: [["gatto", "Gatto"], ["volpe", "Volpe"], ["orso", "Orso"], ["coniglio", "Coniglio"], ["lupo", "Lupo"], ["panda", "Panda"], ["leone", "Leone"], ["cane", "Cane"]],
+  corpo: [["esile", "Esile"], ["media", "Media"], ["robusta", "Robusta"], ["morbida", "Morbida"]],
+  capelli: [["corti", "Corti"], ["lunghi", "Lunghi"], ["ricci", "Ricci"], ["raccolti", "Raccolti"], ["rasati", "Rasati"], ["nessuno", "Nessuno"]],
+  tinta: [["nero", "Neri"], ["castano", "Castani"], ["biondo", "Biondi"], ["rosso", "Rossi"], ["grigio", "Grigi"], ["pastello", "Rosa"]],
+  stile: [["realistico", "Realistico"], ["cartone", "Cartone"], ["fumetto", "Fumetto"]],
+};
+const TINTE = { c1: "#f6e1d3", c2: "#eac4a8", c3: "#d5a77d", c4: "#b98457", c5: "#8a5a3b", c6: "#5a3824", verde: "#9be3c4", azzurro: "#a9d3f5", viola: "#c3a6e8",
+  rosa: "#f4b6cf", argento: "#c8ccd2", oro: "#d9b44a", nero: "#222222", bianco: "#f5f5f5" };
+const coloriPer = tipo => tipo === "umano" || tipo === "elfo" ? ["c1", "c2", "c3", "c4", "c5", "c6"] : tipo === "animale" ? ["c2", "c4", "c5", "c6", "bianco", "nero", "argento"]
+  : tipo === "robot" ? ["argento", "oro", "nero", "bianco", "azzurro", "rosa"] : ["verde", "azzurro", "viola", "rosa", "argento", "oro"];
+let scelte = { tipo: "umano", animale: "gatto", corpo: "media", colore: "c3", capelli: "corti", tinta: "castano", stile: "realistico" }, schedaAvatar = "modelli", creando = false;
+
+function usaAvatar(a) {
+  profilo.avatar = a;
+  if (a && a.creato && !profilo.avatari.some(x => x.url === a.url)) profilo.avatari = [a, ...profilo.avatari].slice(0, 8);
+  vistaAvatar = 0; vestito = true; ricorda(); if (!$("s-camerino").hidden) disegna();
+}
+async function chiediAvatar(corpo) {
+  const r = await fetch(SERVER + "/avatar", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ genere: profilo.genere, ...corpo }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.url) throw new Error(d.messaggio || "Non ci sono riuscito. Riprova.");
+  await new Promise((ok, ko) => { const im = new Image(); im.onload = ok; im.onerror = ko; im.src = d.url; });
+  return d.url;
+}
+/** Foto ridotta a 1024 px in JPEG: meno da inviare, stessa resa. */
+async function riduci(file) {
+  const im = new Image(); im.src = URL.createObjectURL(file); await im.decode();
+  const s = Math.min(1, 1024 / Math.max(im.naturalWidth, im.naturalHeight)), cv = document.createElement("canvas");
+  cv.width = Math.round(im.naturalWidth * s); cv.height = Math.round(im.naturalHeight * s);
+  cv.getContext("2d").drawImage(im, 0, 0, cv.width, cv.height); URL.revokeObjectURL(im.src);
+  return cv.toDataURL("image/jpeg", 0.86);
+}
+function apriAvatar() {
+  const corpo = apriFoglio("Il tuo avatar", "");
+  const g = profilo.genere, attuale = profilo.avatar?.genere === g ? profilo.avatar.url : null;
+  const carta = (url, nome, sel) => `<button class="carta" data-url="${esc(url)}" data-nome="${esc(nome)}"><img src="${esc(url)}" alt="${esc(nome)}" style="${sel ? "outline:2px solid var(--ink);outline-offset:2px" : ""}"><small>${esc(nome)}</small></button>`;
+  const gruppo = (k, voci) => `<div class="campo"><div class="etichetta"><span>${{ tipo: "Chi", animale: "Animale", corpo: "Corporatura", capelli: "Capelli", tinta: "Colore capelli", stile: "Stile" }[k]}</span></div>
+    <div class="scelte" data-k="${k}">${voci.map(([v, n]) => `<button data-v="${v}" aria-pressed="${scelte[k] === v}">${n}</button>`).join("")}</div></div>`;
+  const disegnaScheda = () => {
+    const schede = `<div class="filtri">${[["modelli", "Modelli"], ["foto", "Dalla tua foto"], ["personaggio", "Personaggio"]].map(([k, n]) => `<button class="piccolo" data-s="${k}" aria-pressed="${schedaAvatar === k}">${n}</button>`).join("")}</div>`;
+    let html = "";
+    if (schedaAvatar === "modelli") {
+      const miei = profilo.avatari.filter(a => a.genere === g);
+      const base = (f, n) => `<button class="carta" data-url="" data-nome="${n}"><img src="../img/${f}.jpg" alt="${n}" style="${!attuale ? "outline:2px solid var(--ink);outline-offset:2px" : ""}"><small>${n}</small></button>`;
+      html = `<div class="griglia">${MODELLI[g].map(([f, n]) => n === "Base" ? base(f, n) : carta(BASE_AVATAR + f + ".jpg", n, attuale === BASE_AVATAR + f + ".jpg")).join("")}</div>` +
+        (miei.length ? `<div class="etichetta" style="margin:18px 0 8px"><span>Creati da te</span></div><div class="griglia">${miei.map(a => carta(a.url, a.nome, attuale === a.url)).join("")}</div>` : "");
+    }
+    if (schedaAvatar === "foto") html = `<div class="dettagli" style="gap:10px;font-size:14px">
+        <p style="margin:0">Una foto in piedi, vestito, di fronte, con buona luce. Meglio se si vede tutta la figura.</p>
+        <label class="pieno" style="cursor:pointer">${creando ? "Un attimo…" : "Scegli la foto"}<input type="file" id="av-foto" accept="image/*" hidden ${creando ? "disabled" : ""}></label>
+        <p class="note" style="margin:0">La foto serve solo a creare l'avatar e non viene conservata.</p><div id="av-esito"></div></div>`;
+    if (schedaAvatar === "personaggio") {
+      const t = scelte.tipo, colori = coloriPer(t);
+      if (!colori.includes(scelte.colore)) scelte.colore = colori[0];
+      html = gruppo("tipo", OPZ.tipo) + (t === "animale" ? gruppo("animale", OPZ.animale) : "") +
+        `<div class="campo"><div class="etichetta"><span>${t === "animale" ? "Pelo" : t === "robot" ? "Colore" : "Pelle"}</span></div><div class="scelte" data-k="colore">${colori.map(c => `<button data-v="${c}" aria-pressed="${scelte.colore === c}" aria-label="${c}" style="width:40px;background:${TINTE[c]};${scelte.colore === c ? "box-shadow:inset 0 0 0 2px var(--carta);border:2px solid var(--ink)" : ""}"></button>`).join("")}</div></div>` +
+        gruppo("corpo", OPZ.corpo) + (t === "animale" || t === "robot" ? "" : gruppo("capelli", OPZ.capelli) + (["rasati", "nessuno"].includes(scelte.capelli) ? "" : gruppo("tinta", OPZ.tinta))) +
+        gruppo("stile", OPZ.stile) + `<div class="campo"><button class="pieno" id="av-crea" ${creando ? "disabled" : ""}>${creando ? "Lo sto creando…" : "Crea"}</button><div id="av-esito"></div></div>`;
+    }
+    corpo.innerHTML = schede + html;
+    const f = corpo.querySelector("#av-foto");
+    if (f) f.onchange = async e => {
+      const file = e.target.files[0]; if (!file) return;
+      creando = true; disegnaScheda();
+      try { const url = await chiediAvatar({ modo: "foto", foto: await riduci(file) }); usaAvatar({ url, genere: g, nome: "Dalla foto", creato: true }); creando = false; schedaAvatar = "modelli"; disegnaScheda(); toast("Avatar pronto"); }
+      catch (err) { creando = false; disegnaScheda(); corpo.querySelector("#av-esito").innerHTML = `<p class="male" style="margin:0">${esc(err.message)}</p>`; }
+    };
+  };
+  disegnaScheda();
+  corpo.onclick = async e => {
+    const s = e.target.closest("[data-s]"); if (s) { schedaAvatar = s.dataset.s; return disegnaScheda(); }
+    const o = e.target.closest("[data-k] button"); if (o) { scelte[o.parentElement.dataset.k] = o.dataset.v; return disegnaScheda(); }
+    const c = e.target.closest(".carta");
+    if (c) { usaAvatar(c.dataset.url ? { url: c.dataset.url, genere: g, nome: c.dataset.nome, creato: !c.dataset.url.startsWith(BASE_AVATAR) } : null); chiudiFoglio(); return; }
+    if (e.target.closest("#av-crea") && !creando) {
+      creando = true; disegnaScheda();
+      const nome = scelte.tipo === "animale" ? OPZ.animale.find(x => x[0] === scelte.animale)[1] : OPZ.tipo.find(x => x[0] === scelte.tipo)[1];
+      try { const url = await chiediAvatar({ modo: "personaggio", scelte }); usaAvatar({ url, genere: g, nome, creato: true }); creando = false; schedaAvatar = "modelli"; disegnaScheda(); toast("Avatar pronto"); }
+      catch (err) { creando = false; disegnaScheda(); corpo.querySelector("#av-esito").innerHTML = `<p class="male" style="margin:8px 0 0">${esc(err.message)}</p>`; }
+    }
+  };
+}
 
 // ======================================================================
 // I CAPI SULL'AVATAR — detto com'è finché non è acceso
