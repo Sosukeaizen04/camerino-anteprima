@@ -105,6 +105,13 @@ def main():
     cache = radice / ".cache"
     solo_cache = "--cache" in sys.argv
     negozi, out = [], []
+    # verifiche fatte da catalogo.py nelle ultime 6 ore (stesso giro notturno): niente doppi controlli sui negozi
+    try:
+        v = json.loads((cache / "verifiche.json").read_text())
+        verificati = v["negozi"] if __import__("time").time() - v["quando"] < 6 * 3600 else {}
+    except Exception:
+        verificati = {}
+    verificati_ok = bool(verificati)
     for dominio, nome, sistema, stile, misto in C.NEGOZI:
         try:
             if solo_cache:
@@ -114,7 +121,13 @@ def main():
         except Exception as e:
             print(f"!! {dominio}: {e}", file=sys.stderr)
             continue
-        if not solo_cache:
+        gia = verificati.get(dominio)          # catalogo.py ha appena controllato questo negozio: si riusa
+        if gia:
+            dati["host"] = gia["host"]
+        elif verificati_ok:
+            print(f"!! {dominio}: escluso da catalogo.py (non leggibile dal browser)", file=sys.stderr)
+            continue
+        elif not solo_cache:
             prova = [p["handle"] for p in dati["prodotti"] if any(v["available"] for v in p["variants"])][:3]
             host = next((h for h in (C.dal_vivo(dati["host"], x) for x in prova) if h), None)
             if not host:
@@ -164,9 +177,11 @@ def main():
                     "i": img.replace("https://cdn.shopify.com/s/files/", "~"),
                     "s": maschera(prodotte), "d": maschera(disponibili),
                 })
-        if not solo_cache and len(out) > primo:
-            propri, tolti = C.togli_nascosti(dati["host"], out[primo:])
-            out[primo:] = propri
+        if gia:
+            nascosti = set(gia["nascosti"])
+            out[primo:] = [c for c in out[primo:] if c["h"] not in nascosti]
+        elif not solo_cache and len(out) > primo:
+            out[primo:] = C.togli_nascosti(dati["host"], out[primo:])[0]
         mio = out[primo:]
         conta = lambda g: sum(1 for c in mio if c["g"] == g)
         print(f"{nome:24} donna {conta('d'):5}  uomo {conta('u'):5}  unisex {conta('x'):4}  scarpe {sum(1 for c in mio if c['c'] == 'scarpe'):4}", file=sys.stderr)

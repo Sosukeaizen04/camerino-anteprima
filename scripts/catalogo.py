@@ -354,10 +354,10 @@ def togli_nascosti(host, capi_negozio):
     with ThreadPoolExecutor(2) as ex:
         mancano = sum(1 for ok in ex.map(lambda h: esiste(host, h), campione) if not ok)
     if mancano <= len(campione) // 10:
-        return capi_negozio, 0
+        return capi_negozio, 0, set()
     with ThreadPoolExecutor(2) as ex:
         vive = {h for h, ok in zip(maniglie, ex.map(lambda h: esiste(host, h), maniglie)) if ok}
-    return [c for c in capi_negozio if c["h"] in vive], len(maniglie) - len(vive)
+    return [c for c in capi_negozio if c["h"] in vive], len(maniglie) - len(vive), set(maniglie) - vive
 
 
 def main():
@@ -365,6 +365,7 @@ def main():
     cache = radice / ".cache"
     cache.mkdir(exist_ok=True)
     negozi, out = [], []
+    verifiche = {}   # dominio → dominio finale e capi nascosti: catalogo2.py li riusa invece di ricontrollare
     for dominio, nome, sistema, stile, misto in NEGOZI:
         try:
             dati = leggi_negozio(dominio, cache)
@@ -417,7 +418,8 @@ def main():
                     "s": maschera(prodotte), "d": maschera(disponibili),
                 })
                 tenuti += 1
-        propri, tolti = togli_nascosti(dati["host"], out[-tenuti:] if tenuti else [])
+        propri, tolti, nascosti = togli_nascosti(dati["host"], out[-tenuti:] if tenuti else [])
+        verifiche[dominio] = {"host": dati["host"], "nascosti": sorted(nascosti)}
         if tolti:
             out[-tenuti:] = propri
             tenuti = len(propri)
@@ -435,6 +437,7 @@ def main():
         print(f"colore dalla foto: {sum(1 for c in senza if 'm' in c)} su {len(senza)} capi senza colore nel nome", file=sys.stderr)
     except ImportError:
         print("!! Pillow assente: colore dalla foto saltato", file=sys.stderr)
+    (cache / "verifiche.json").write_text(json.dumps({"quando": time.time(), "negozi": verifiche}))
     dati = {"aggiornato": datetime.now().strftime("%Y-%m-%d %H:%M"), "taglie": TAGLIE, "cambio": EURO,
             "negozi": negozi, "capi": out}
     dest = radice / "data" / "catalogo.json"

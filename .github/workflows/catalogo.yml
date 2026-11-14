@@ -37,9 +37,22 @@ jobs:
           path: .cache/colori.json
           key: colori-${{ github.run_id }}
           restore-keys: colori-
+      # Quando si pubblica un cambiamento dell'app il catalogo non si rifà (sono ~20 minuti): si riprende quello già online.
+      # Si rilegge tutto solo nel giro di notte, se lo si lancia a mano, o se il catalogo online non si scarica.
+      - name: Catalogo già online (pubblicazioni dell'app)
+        id: online
+        if: github.event_name == 'push'
+        continue-on-error: true
+        run: |
+          base=https://sosukeaizen04.github.io/camerino-anteprima/data
+          mkdir -p data
+          for f in catalogo v2-donna v2-uomo; do curl -sf -m 60 -o data/$f.json $base/$f.json; done
+          python -c "import json; [json.load(open(f'data/{f}.json')) for f in ('catalogo','v2-donna','v2-uomo')]"
       - name: Catalogo
+        if: github.event_name != 'push' || steps.online.outcome != 'success'
         run: python scripts/catalogo.py
       - name: Catalogo del nuovo camerino (genere e scarpe), dagli stessi dati appena letti
+        if: github.event_name != 'push' || steps.online.outcome != 'success'
         run: python scripts/catalogo2.py
       - name: Controllo minimo
         run: |
