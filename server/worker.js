@@ -20,7 +20,8 @@ function istruzioni(capi) {
   const elenco = capi.map((c, i) => `image ${i + 2}: ${POSTI[c.posto]}`).join("; ");
   return `Image 1 is a person standing on a plain white background. Dress this exact person in the garments shown in the other images (${elenco}). ` +
     `The garment photos may show other models or other clothes: take only the indicated garment from each one, keeping its exact colour, fabric, pattern, length and details. ` +
-    `Replace the person's current clothes completely with these garments, nothing else: no extra accessories, bags, hats or jewellery. ` +
+    `Replace the person's current clothes completely with these garments, nothing else. ` +
+    `Do not copy anything else that appears in the garment photos: no socks, tights, belts, bags, hats, scarves, sunglasses or jewellery. If the legs show, they are bare. ` +
     `Keep the person's face, hair, skin tone, body shape, height and pose identical, full body from head to toe visible, same plain white background, same soft studio light, realistic fashion catalogue photo.`;
 }
 

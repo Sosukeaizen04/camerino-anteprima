@@ -13,4 +13,4 @@ BASE_AVATAR = "https://sosukeaizen04.github.io/camerino-anteprima/img/avatar_"
 # KV_ID viene scritto da prepara.sh
 [[kv_namespaces]]
 binding = "MEMORIA"
-id = "KV_ID"
+id = "5a1843f2eeaf4104abbe27bc3d32abdf"

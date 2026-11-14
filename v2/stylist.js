@@ -104,7 +104,7 @@ const COMUNI = ["Minimal", "Parigino", "Denim", "Colore", "Italiano", "Maglieria
 const affinita = (a, b) => a === b ? 2 : AFFINI[a]?.includes(b) ? 1 : -2;
 
 // ---------- stagione ----------
-const DA_CALDO = /sandal|slide|\bmules?\b|slingback|open.?toe|strappy|feather|espadrill|flip.?flop|tong\b|shorts?\b|bermuda|\blinen|\blin\b|\blino\b|crochet|raffia|sleeveless|sans manches|d[ée]bardeur|canott|\btank\b|\bcami\b|bandeau|bikini|mini ?short/i;
+const DA_CALDO = /sandal|slide|adilette|slipper|pantofol|ciabatt|claquette|\bmules?\b|slingback|open.?toe|strappy|feather|espadrill|flip.?flop|tong\b|shorts?\b|bermuda|\blinen|\blin\b|\blino\b|crochet|raffia|sleeveless|sans manches|d[ée]bardeur|canott|\btank\b|\bcami\b|bandeau|bikini|mini ?short/i;
 const DA_FREDDO = /\bboots?\b|bottes?|bottines?|stival|\bwool|laine|\blana\b|cashmere|cachemire|puffer|piumin|doudoune|shearling|fleece|polaire|velvet|velours|turtleneck|col roul/i;
 /** Il capo è fuori stagione? `freddo` = si sta componendo per i mesi freddi. Vale solo per le proposte, non per la ricerca. */
 export const fuoriStagione = (capo, freddo) => (freddo ? DA_CALDO : DA_FREDDO).test(capo.t);

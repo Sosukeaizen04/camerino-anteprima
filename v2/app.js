@@ -19,7 +19,7 @@ let seme = Date.now() % 1e9;
 let genereDati = null, daProvare = null, vistaAvatar = 0;
 
 // ---------- prova addosso: il server (server/worker.js) veste l'avatar col look; vuoto = non ancora acceso ----------
-const SERVER = (() => { try { return localStorage.getItem("camerino-server"); } catch { return null; } })() || "";   // in prova si può indicare un server locale
+const SERVER = (() => { try { return localStorage.getItem("camerino-server"); } catch { return null; } })() || "https://camerino-prova.camerino.workers.dev";   // in prova si può indicare un server locale
 const BASE_AVATAR = "https://sosukeaizen04.github.io/camerino-anteprima/img/";
 const prove = (() => { try { return JSON.parse(localStorage.getItem(CHIAVE + "-prove")) || {}; } catch { return {}; } })();   // look → immagine
 let vestito = true, inCorso = null;          // vestito = mostra l'avatar col look quando c'è; inCorso = look che si sta vestendo
