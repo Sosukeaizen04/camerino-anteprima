@@ -18,6 +18,33 @@ let DATI = null, INDICE = new Map(), esclusi = new Set(), manca = [];
 let seme = Date.now() % 1e9;
 let genereDati = null, daProvare = null, vistaAvatar = 0;
 
+// ---------- prova addosso: il server (server/worker.js) veste l'avatar col look; vuoto = non ancora acceso ----------
+const SERVER = (() => { try { return localStorage.getItem("camerino-server"); } catch { return null; } })() || "";   // in prova si può indicare un server locale
+const BASE_AVATAR = "https://sosukeaizen04.github.io/camerino-anteprima/img/";
+const prove = (() => { try { return JSON.parse(localStorage.getItem(CHIAVE + "-prove")) || {}; } catch { return {}; } })();   // look → immagine
+let vestito = true, inCorso = null;          // vestito = mostra l'avatar col look quando c'è; inCorso = look che si sta vestendo
+const chiaveLook = () => profilo.genere + "|" + S.capiDi(outfit).map(S.chiave).join("+");
+function ricordaProve() {
+  const k = Object.keys(prove); for (const x of k.slice(0, Math.max(0, k.length - 60))) delete prove[x];    // le ultime 60 bastano
+  try { localStorage.setItem(CHIAVE + "-prove", JSON.stringify(prove)); } catch {}
+}
+async function provaLook() {
+  if (!SERVER || inCorso || S.mancanti(outfit).length) return;
+  const k = chiaveLook(), front = viste()[0][0];
+  inCorso = k; disegnaPalco();
+  try {
+    const r = await fetch(SERVER + "/prova", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ avatar: `${BASE_AVATAR}${front}.jpg`, capi: S.capiDi(outfit).map(c => ({ posto: S.postoDi(c), url: "https://cdn.shopify.com/s/files/" + c.i.slice(1) })) }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.url) throw new Error(d.messaggio || "Non sono riuscito a vestire l'avatar. Riprova.");
+    await new Promise((ok, ko) => { const im = new Image(); im.onload = ok; im.onerror = ko; im.src = d.url; });    // pronta prima di mostrarla
+    prove[k] = d.url; ricordaProve();
+    if (chiaveLook() === k) { vestito = true; vistaAvatar = 0; }
+    if (d.restano != null && d.restano <= 3) toast(d.restano ? `Oggi ti restano ${d.restano} prove` : "Era l'ultima prova di oggi");
+  } catch (e) { toast(e.message || "Non sono riuscito a vestire l'avatar. Riprova."); }
+  finally { inCorso = null; if (!$("s-camerino").hidden) disegnaPalco(); }
+}
+
 function ricorda() {
   try {
     localStorage.setItem(CHIAVE, JSON.stringify({ profilo, bloccati: [...bloccati], salvati,
@@ -296,6 +323,12 @@ async function componiMancanti() {
 function disegnaPalco(messaggio) {
   if (messaggio) { $("palco").innerHTML = `<div class="riquadro" style="position:absolute;inset:0;height:auto;border:0;background:none"><div class="solo-testo">${esc(messaggio)}</div></div>`; return; }
   const vv = viste(), [file, specchio] = vv[vistaAvatar % vv.length];
+  const k = chiaveLook(), foto_ = prove[k], conLook = !!(foto_ && vestito), completo = !S.mancanti(outfit).length;
+  const pillola = !SERVER ? `<button class="pillola" id="info-prova">I capi sull'avatar arrivano presto</button>`
+    : inCorso === k ? `<span class="pillola">Sto vestendo l'avatar…</span>`
+    : foto_ ? `<button class="pillola" id="vista-look">${vestito ? "Vedi senza il look" : "Vedi con il look"}</button>`
+    : completo ? `<button class="pillola nera" id="prova">Prova il look</button>`
+    : `<span class="pillola">Completa il look per provarlo</span>`;
   const posti = outfit.abito ? ["capospalla", "abito", "scarpe"] : ["capospalla", "sopra", "sotto", "scarpe"];
   const caselle = posti.map(p => {
     const c = outfit[p];
@@ -303,15 +336,16 @@ function disegnaPalco(messaggio) {
     return `<button class="casella ${p}" data-apri="${p}" aria-label="${S.NOME_POSTO[p]}: ${esc(c.t)}"><img src="${foto(c, 160)}" alt="">${bloccati.has(p) ? `<span class="lucchetto">${LUCCHETTO}</span>` : ""}<small>${S.NOME_POSTO[p]}</small></button>`;
   }).join("");
   const giaSalvato = salvati.some(s => s.capi.join() === S.capiDi(outfit).map(S.chiave).join());
-  $("palco").innerHTML = `<img class="avatar${specchio ? " specchio" : ""}" src="../img/${file}.jpg" alt="Avatar" draggable="false">
-    <button class="pillola" id="info-prova">I capi sull'avatar arrivano presto</button>
+  $("palco").innerHTML = (conLook ? `<img class="avatar" src="${esc(foto_)}" alt="L'avatar con il look" draggable="false">`
+      : `<img class="avatar${specchio ? " specchio" : ""}${inCorso === k ? " attesa" : ""}" src="../img/${file}.jpg" alt="Avatar" draggable="false">`) + `
+    ${pillola}
     <div class="colonna">${caselle}</div>
     <div class="attrezzi"><button class="icona" id="salva" aria-label="Salva questo look" aria-pressed="${giaSalvato}">${CUORE}</button><button class="icona" id="condividi" aria-label="Condividi questo look">${MANDA}</button></div>
-    <div class="punti">${vv.map((_, i) => `<i class="${i === vistaAvatar % vv.length ? "ora" : ""}"></i>`).join("")}</div>`;
+    ${conLook ? "" : `<div class="punti">${vv.map((_, i) => `<i class="${i === vistaAvatar % vv.length ? "ora" : ""}"></i>`).join("")}</div>`}`;
 }
 // girare l'avatar trascinando; un tocco fermo sulle caselle le apre
 let presa = null;
-$("palco").addEventListener("pointerdown", e => { if (e.target.closest("button")) return; presa = { x: e.clientX, passi: 0 }; $("palco").classList.add("gira"); $("palco").setPointerCapture(e.pointerId); });
+$("palco").addEventListener("pointerdown", e => { if (e.target.closest("button") || (vestito && prove[chiaveLook()])) return; presa = { x: e.clientX, passi: 0 }; $("palco").classList.add("gira"); $("palco").setPointerCapture(e.pointerId); });
 $("palco").addEventListener("pointermove", e => {
   if (!presa) return;
   const passi = Math.trunc((e.clientX - presa.x) / 55);
@@ -325,6 +359,8 @@ $("palco").addEventListener("click", e => {
   else if (b.id === "salva") salva();
   else if (b.id === "condividi") condividi();
   else if (b.id === "info-prova") apriInfoProva();
+  else if (b.id === "prova") provaLook();
+  else if (b.id === "vista-look") { vestito = !vestito; vistaAvatar = 0; disegnaPalco(); }
 });
 $("altro").onclick = () => componi(true);
 

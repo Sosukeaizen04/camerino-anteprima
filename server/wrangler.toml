@@ -1,0 +1,16 @@
+# Server della prova addosso. Pubblicazione: npx wrangler deploy (dopo ./prepara.sh, una volta sola).
+name = "camerino-prova"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+MODELLO = "google/nano-banana-2.1/edit"
+LIMITE_PERSONA = "15"     # prove al giorno per persona
+LIMITE_GIORNO = "120"     # prove al giorno in tutto (~5 € al giorno al massimo)
+ORIGINI = "https://sosukeaizen04.github.io,http://localhost:8765"
+BASE_AVATAR = "https://sosukeaizen04.github.io/camerino-anteprima/img/avatar_"
+
+# KV_ID viene scritto da prepara.sh
+[[kv_namespaces]]
+binding = "MEMORIA"
+id = "KV_ID"

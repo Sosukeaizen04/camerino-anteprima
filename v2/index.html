@@ -90,6 +90,8 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 .punti i { width: 5px; height: 5px; border-radius: 50%; background: var(--riga); }
 .punti i.ora { background: var(--ink); }
 .pillola { position: absolute; left: max(20px, env(safe-area-inset-left, 0px)); top: 6px; font-size: 11px; color: var(--ink-2); background: var(--carta); border: 1px solid var(--riga); padding: 4px 8px; }
+.pillola.nera { background: var(--ink); color: var(--carta); border-color: var(--ink); font-size: 13px; padding: 8px 14px; }
+.palco .avatar.attesa { opacity: .45; transition: opacity .3s; }
 .colonna { position: absolute; right: max(14px, env(safe-area-inset-right, 0px)); top: 6px; bottom: 26px; display: flex; flex-direction: column; gap: 6px; justify-content: center; }
 .casella { position: relative; width: 62px; height: 78px; border: 1px solid var(--riga); background: var(--velo); overflow: hidden; }
 .casella img { width: 100%; height: 100%; object-fit: cover; object-position: center top; pointer-events: none; }
