@@ -1,5 +1,6 @@
 // Camerino v2 — schermate. Le regole dell'outfit stanno in stylist.js.
 import * as S from "./stylist.js";
+import { LINGUA, cambiaLingua, tr } from "./lingua.js";
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -23,6 +24,29 @@ const SERVER = (() => { try { return localStorage.getItem("camerino-server"); } 
 const BASE_AVATAR = "https://sosukeaizen04.github.io/camerino-anteprima/img/";
 const prove = (() => { try { return JSON.parse(localStorage.getItem(CHIAVE + "-prove")) || {}; } catch { return {}; } })();   // look → immagine
 let vestito = true, inCorso = null;          // vestito = mostra l'avatar col look quando c'è; inCorso = look che si sta vestendo
+// ---------- girare: davanti → destra → dietro → sinistra. Ogni vista è un'immagine generata solo quando la si chiede, poi resta ----------
+const GIRI = ["fronte", "destra", "dietro", "sinistra"];
+const NOME_GIRO = { fronte: "Davanti", destra: "Lato destro", dietro: "Dietro", sinistra: "Lato sinistro" };
+const giri = (() => { try { return JSON.parse(localStorage.getItem(CHIAVE + "-giri")) || {}; } catch { return {}; } })();   // "immagine|vista" → immagine girata
+let vistaGiro = 0, girando = null;
+function ricordaGiri() {
+  const k = Object.keys(giri); for (const x of k.slice(0, Math.max(0, k.length - 90))) delete giri[x];
+  try { localStorage.setItem(CHIAVE + "-giri", JSON.stringify(giri)); } catch {}
+}
+async function gira(fronte, vista) {
+  const k = fronte + "|" + vista;
+  if (giri[k] || girando) return;
+  girando = k; disegnaPalco();
+  try {
+    const r = await fetch(SERVER + "/gira", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ immagine: fronte, vista, lingua: LINGUA }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.url) throw new Error(d.messaggio || "Non sono riuscito a girare l'avatar. Riprova.");
+    await new Promise((ok, ko) => { const im = new Image(); im.onload = ok; im.onerror = ko; im.src = d.url; });
+    giri[k] = d.url; ricordaGiri();
+    if (d.restano != null && d.restano <= 3) toast(d.restano ? `Oggi ti restano ${d.restano} immagini` : "Era l'ultima immagine di oggi");
+  } catch (e) { toast(e.message || "Non sono riuscito a girare l'avatar. Riprova."); if (girando === k) vistaGiro = 0; }
+  finally { girando = null; if (!$("s-camerino").hidden) disegnaPalco(); }
+}
 const chiaveLook = () => profilo.genere + "|" + (profilo.avatar?.url || "") + "|" + S.capiDi(outfit).map(S.chiave).join("+");
 function ricordaProve() {
   const k = Object.keys(prove); for (const x of k.slice(0, Math.max(0, k.length - 60))) delete prove[x];    // le ultime 60 bastano
@@ -34,12 +58,12 @@ async function provaLook() {
   inCorso = k; disegnaPalco();
   try {
     const r = await fetch(SERVER + "/prova", { method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ avatar: avatarPerServer(), capi: S.capiDi(outfit).map(c => ({ posto: S.postoDi(c), url: "https://cdn.shopify.com/s/files/" + c.i.slice(1) })) }) });
+      body: JSON.stringify({ lingua: LINGUA, avatar: avatarPerServer(), capi: S.capiDi(outfit).map(c => ({ posto: S.postoDi(c), url: "https://cdn.shopify.com/s/files/" + c.i.slice(1) })) }) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.url) throw new Error(d.messaggio || "Non sono riuscito a vestire l'avatar. Riprova.");
     await new Promise((ok, ko) => { const im = new Image(); im.onload = ok; im.onerror = ko; im.src = d.url; });    // pronta prima di mostrarla
     prove[k] = d.url; ricordaProve();
-    if (chiaveLook() === k) { vestito = true; vistaAvatar = 0; }
+    if (chiaveLook() === k) { vestito = true; vistaAvatar = 0; vistaGiro = 0; }
     if (d.restano != null && d.restano <= 3) toast(d.restano ? `Oggi ti restano ${d.restano} prove` : "Era l'ultima prova di oggi");
   } catch (e) { toast(e.message || "Non sono riuscito a vestire l'avatar. Riprova."); }
   finally { inCorso = null; if (!$("s-camerino").hidden) disegnaPalco(); }
@@ -201,10 +225,16 @@ function apriAccount(prima = JSON.stringify(profilo)) {
       <button class="vuoto" id="a-avatar">Cambia avatar</button></div>
     <div class="campo"><div class="etichetta"><span>Salvati</span><span>${salvati.length}</span></div>
       <button class="vuoto" id="a-salvati">Vedi i look salvati</button></div>
+    <div class="campo"><div class="etichetta"><span>Lingua</span></div>
+      <div class="scelte" id="a-lingua" translate="no"><button data-l="it" aria-pressed="${LINGUA === "it"}">Italiano</button><button data-l="en" aria-pressed="${LINGUA === "en"}">English</button></div></div>
+    <div class="campo"><button class="vuoto" id="a-guida">Come funziona</button></div>
     <div class="campo"><button class="testo-link" id="a-azzera" style="justify-self:start">Cancella tutto e ricomincia</button></div>`);
   corpo.onclick = e => {
     if (e.target.closest("#a-salvati")) { chiudiFoglio(); return apriSalvati(); }
     if (e.target.closest("#a-avatar")) { chiudiFoglio(); return apriAvatar(); }
+    if (e.target.closest("#a-guida")) { chiudiFoglio(); return apriGuida(0); }
+    const lb = e.target.closest("#a-lingua button");
+    if (lb) { cambiaLingua(lb.dataset.l); for (const x of lb.parentElement.children) x.setAttribute("aria-pressed", x === lb); return; }
     if (e.target.closest("#a-azzera")) {
       if (!corpo.querySelector("#a-azzera").dataset.sicuro) { corpo.querySelector("#a-azzera").dataset.sicuro = 1; corpo.querySelector("#a-azzera").textContent = "Tocca di nuovo per cancellare profilo, look e salvati"; return; }
       try { localStorage.removeItem(CHIAVE); } catch {}
@@ -263,6 +293,7 @@ async function entra() {
   }
   if (!S.capiDi(outfit).length) await componi(false);
   else disegna();
+  if (!profilo.guidaVista) { profilo.guidaVista = true; ricorda(); setTimeout(() => apriGuida(0), 400); }
 }
 
 /** Compone (o ricompone) tenendo i capi bloccati, poi controlla sul sito dei marchi che la taglia ci sia davvero. */
@@ -292,6 +323,7 @@ async function componi(avvisa = true) {
 const LUCCHETTO = `<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`;
 const CUORE = `<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>`;
 const FIGURA = `<svg viewBox="0 0 24 24"><circle cx="12" cy="6" r="3"/><path d="M12 9v7M8 12h8M12 16l-3 5M12 16l3 5"/></svg>`;
+const LENTE = `<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5M11 8.5v5M8.5 11h5"/></svg>`;
 const MANDA = `<svg viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M5 13v6h14v-6"/></svg>`;
 /** Le viste dell'avatar: [indirizzo, a specchio]. Quello base si gira trascinando; un avatar scelto o creato ha una vista sola. */
 const avatarScelto = () => profilo.avatar && profilo.avatar.genere === profilo.genere ? profilo.avatar : null;
@@ -329,10 +361,21 @@ async function componiMancanti() {
 
 function disegnaPalco(messaggio) {
   if (messaggio) { $("palco").innerHTML = `<div class="riquadro" style="position:absolute;inset:0;height:auto;border:0;background:none"><div class="solo-testo">${esc(messaggio)}</div></div>`; return; }
-  const vv = viste(), [file, specchio] = vv[vistaAvatar % vv.length];
-  const k = chiaveLook(), foto_ = prove[k], conLook = !!(foto_ && vestito), completo = !S.mancanti(outfit).length;
+  const vv = viste(), k = chiaveLook(), foto_ = prove[k], conLook = !!(foto_ && vestito), completo = !S.mancanti(outfit).length;
+  // quale immagine: l'avatar base senza look ha già le sue viste (gratis, si gira trascinando); gli altri si girano con le frecce
+  const base = !conLook && !avatarScelto();
+  const fronte = conLook ? foto_ : avatarScelto()?.url;
+  let src, specchio = 0, attesa = inCorso === k;
+  if (base) [src, specchio] = vv[vistaAvatar % vv.length];
+  else {
+    if (vistaGiro && !giri[fronte + "|" + GIRI[vistaGiro]] && girando !== fronte + "|" + GIRI[vistaGiro]) vistaGiro = 0;   // look o avatar cambiato: si torna davanti
+    const vista = GIRI[vistaGiro], girata = vistaGiro ? giri[fronte + "|" + vista] : fronte;
+    src = girata || fronte; if (!girata) attesa = true;
+  }
+  palcoOra = { src, specchio, fronte, base };
   const pillola = !SERVER ? `<button class="pillola" id="info-prova">I capi sull'avatar arrivano presto</button>`
     : inCorso === k ? `<span class="pillola">Sto vestendo l'avatar…</span>`
+    : girando ? `<span class="pillola">Sto girando l'avatar…</span>`
     : foto_ ? `<button class="pillola" id="vista-look">${vestito ? "Vedi senza il look" : "Vedi con il look"}</button>`
     : completo ? `<button class="pillola nera" id="prova">Prova il look</button>`
     : `<span class="pillola">Completa il look per provarlo</span>`;
@@ -343,16 +386,43 @@ function disegnaPalco(messaggio) {
     return `<button class="casella ${p}" data-apri="${p}" aria-label="${S.NOME_POSTO[p]}: ${esc(c.t)}"><img src="${foto(c, 160)}" alt="">${bloccati.has(p) ? `<span class="lucchetto">${LUCCHETTO}</span>` : ""}<small>${S.NOME_POSTO[p]}</small></button>`;
   }).join("");
   const giaSalvato = salvati.some(s => s.capi.join() === S.capiDi(outfit).map(S.chiave).join());
-  $("palco").innerHTML = (conLook ? `<img class="avatar" src="${esc(foto_)}" alt="L'avatar con il look" draggable="false">`
-      : `<img class="avatar${specchio ? " specchio" : ""}${inCorso === k ? " attesa" : ""}" src="${esc(file)}" alt="Avatar" draggable="false">`) + `
+  const nomeVista = base ? null : NOME_GIRO[GIRI[vistaGiro]];
+  const frecce = base ? (vv.length > 1 ? `<div class="giro"><button class="icona" id="gira-sx" aria-label="Gira a sinistra">‹</button><span class="punti-giro">${vv.map((_, i) => `<i class="${i === vistaAvatar % vv.length ? "ora" : ""}"></i>`).join("")}</span><button class="icona" id="gira-dx" aria-label="Gira a destra">›</button></div>` : "")
+    : SERVER ? `<div class="giro"><button class="icona" id="gira-sx" aria-label="Gira a sinistra" ${girando ? "disabled" : ""}>‹</button><span class="nome-vista">${nomeVista}</span><button class="icona" id="gira-dx" aria-label="Gira a destra" ${girando ? "disabled" : ""}>›</button></div>` : "";
+  $("palco").innerHTML = `<img class="avatar${specchio ? " specchio" : ""}${attesa ? " attesa" : ""}" src="${esc(src)}" alt="${conLook ? "L'avatar con il look" : "Avatar"}" draggable="false">
     ${pillola}
     <div class="colonna">${caselle}</div>
-    <div class="attrezzi"><button class="icona" id="salva" aria-label="Salva questo look" aria-pressed="${giaSalvato}">${CUORE}</button><button class="icona" id="condividi" aria-label="Condividi questo look">${MANDA}</button><button class="icona" id="cambia-avatar" aria-label="Cambia avatar">${FIGURA}</button></div>
-    ${conLook || vv.length < 2 ? "" : `<div class="punti">${vv.map((_, i) => `<i class="${i === vistaAvatar % vv.length ? "ora" : ""}"></i>`).join("")}</div>`}`;
+    <div class="attrezzi"><button class="icona" id="salva" aria-label="Salva questo look" aria-pressed="${giaSalvato}">${CUORE}</button><button class="icona" id="condividi" aria-label="Condividi questo look">${MANDA}</button><button class="icona" id="cambia-avatar" aria-label="Cambia avatar">${FIGURA}</button><button class="icona" id="zoom" aria-label="Ingrandisci">${LENTE}</button></div>
+    ${frecce}`;
+}
+let palcoOra = {};
+/** Una freccia: l'avatar base passa alla vista dopo; gli altri chiedono la vista al server se non c'è ancora. */
+function frecciaGiro(verso) {
+  if (palcoOra.base) { const n = viste().length; vistaAvatar = ((vistaAvatar + verso) % n + n) % n; return disegnaPalco(); }
+  if (girando) return;
+  vistaGiro = ((vistaGiro + verso) % 4 + 4) % 4;
+  const vista = GIRI[vistaGiro];
+  if (vistaGiro && !giri[palcoOra.fronte + "|" + vista]) gira(palcoOra.fronte, vista); else disegnaPalco();
+}
+
+// ---------- zoom: l'immagine a tutto schermo; un tocco ingrandisce lì dove si tocca, trascinando si sposta ----------
+function apriZoom() {
+  const z = $("zoom-vista"), im = z.querySelector("img");
+  im.src = palcoOra.src; im.className = palcoOra.specchio ? "specchio" : ""; z.classList.remove("dentro"); z.hidden = false;
+}
+{
+  const z = $("zoom-vista"), im = z.querySelector("img");
+  let tocco = null;
+  const centra = e => { const r = z.getBoundingClientRect(); im.style.transformOrigin = `${(e.clientX - r.left) / r.width * 100}% ${(e.clientY - r.top) / r.height * 100}%`; };
+  z.addEventListener("pointerdown", e => { if (e.target.closest("button")) return; tocco = { x: e.clientX, y: e.clientY, mosso: false }; z.setPointerCapture(e.pointerId); });
+  z.addEventListener("pointermove", e => { if (!tocco) return; if (Math.hypot(e.clientX - tocco.x, e.clientY - tocco.y) > 6) tocco.mosso = true; if (z.classList.contains("dentro") && tocco.mosso) centra(e); });
+  z.addEventListener("pointerup", e => { if (tocco && !tocco.mosso) { if (!z.classList.contains("dentro")) centra(e); z.classList.toggle("dentro"); } tocco = null; });
+  z.querySelector("button").onclick = () => { z.hidden = true; };
+  document.addEventListener("keydown", e => { if (e.key === "Escape") z.hidden = true; });
 }
 // girare l'avatar trascinando; un tocco fermo sulle caselle le apre
 let presa = null;
-$("palco").addEventListener("pointerdown", e => { if (e.target.closest("button") || (vestito && prove[chiaveLook()]) || viste().length < 2) return; presa = { x: e.clientX, passi: 0 }; $("palco").classList.add("gira"); $("palco").setPointerCapture(e.pointerId); });
+$("palco").addEventListener("pointerdown", e => { if (e.target.closest("button") || !palcoOra.base || viste().length < 2) return; presa = { x: e.clientX, passi: 0 }; $("palco").classList.add("gira"); $("palco").setPointerCapture(e.pointerId); });
 $("palco").addEventListener("pointermove", e => {
   if (!presa) return;
   const passi = Math.trunc((e.clientX - presa.x) / 55);
@@ -368,7 +438,10 @@ $("palco").addEventListener("click", e => {
   else if (b.id === "info-prova") apriInfoProva();
   else if (b.id === "prova") provaLook();
   else if (b.id === "cambia-avatar") apriAvatar();
-  else if (b.id === "vista-look") { vestito = !vestito; vistaAvatar = 0; disegnaPalco(); }
+  else if (b.id === "vista-look") { vestito = !vestito; vistaAvatar = 0; vistaGiro = 0; disegnaPalco(); }
+  else if (b.id === "gira-sx") frecciaGiro(-1);
+  else if (b.id === "gira-dx") frecciaGiro(1);
+  else if (b.id === "zoom") apriZoom();
 });
 $("altro").onclick = () => componi(true);
 
@@ -414,6 +487,51 @@ $("schede").onclick = e => {
 };
 
 // ======================================================================
+// FILTRI — colore, materiale, lunghezza, maniche (chiesti da Andrea il 14/11). I dati vengono dal negozio: un capo
+// di cui il negozio non dice il materiale non compare quando si filtra per materiale.
+// ======================================================================
+const NOMI_FILTRI = {
+  f: { cotone: "Cotone", lana: "Lana", cashmere: "Cashmere", seta: "Seta", lino: "Lino", pelle: "Pelle", denim: "Denim", velluto: "Velluto", viscosa: "Viscosa", sintetico: "Sintetico" },
+  l: { corta: "Corta", normale: "Normale", lunga: "Lunga" },
+  w: { senza: "Senza maniche", corte: "Maniche corte", "3/4": "Maniche 3/4", lunghe: "Maniche lunghe" },
+};
+NOMI_FILTRI.l.media = "Normale";
+const COLORI_FILTRO = [["nero", "#141414"], ["bianco", "#f7f7f5"], ["panna", "#f1ead8"], ["beige", "#d6c3a3"], ["cammello", "#b0814f"], ["marrone", "#5a3d2b"], ["grigio", "#8d8d8d"],
+  ["navy", "#1c2541"], ["blu", "#2f5d9e"], ["azzurro", "#8fb6dd"], ["verde", "#3f6b45"], ["oliva", "#6b6b3a"], ["rosso", "#b3202a"], ["bordeaux", "#5c1a26"], ["rosa", "#e7a3b5"],
+  ["arancione", "#e5762b"], ["giallo", "#f0cf3a"], ["viola", "#5e3a87"], ["lilla", "#c3a6d8"]];
+const vicinoA = (c, hex) => c.x && Math.hypot(...S.lab(c.x).map((v, i) => v - S.lab(hex)[i])) < 16;
+const nuoviFiltri = () => ({ colore: null, f: null, l: null, w: null, aperti: false });
+/** Quali filtri hanno senso per questo posto (o reparto). */
+const filtriPer = posto => ({ colore: true, f: posto !== "scarpe", l: ["sotto", "abito", "capospalla"].includes(posto), w: ["sopra", "abito"].includes(posto) });
+function passaFiltri(c, st) {
+  if (st.colore && !vicinoA(c, COLORI_FILTRO.find(x => x[0] === st.colore)[1])) return false;
+  if (st.f && c.f !== st.f) return false;
+  if (st.l && (st.l === "normale" ? c.l && c.l !== "media" : c.l !== st.l)) return false;
+  if (st.w && c.w !== st.w) return false;
+  return true;
+}
+const quantiFiltri = st => ["colore", "f", "l", "w"].filter(k => st[k]).length;
+function htmlFiltri(st, posto) {
+  const ok = filtriPer(posto), n = quantiFiltri(st);
+  const testa = `<button class="piccolo" data-filtri="apri" aria-expanded="${st.aperti}">Filtri${n ? ` · ${n}` : ""}</button>${n ? `<button class="piccolo" data-filtri="via">Togli filtri</button>` : ""}`;
+  if (!st.aperti) return testa;
+  const gruppo = (k, titolo, voci) => `<div class="gruppo-filtro"><small>${titolo}</small><div class="scelte">${voci.map(([v, nome]) => `<button data-fk="${k}" data-fv="${v}" aria-pressed="${st[k] === v}">${nome}</button>`).join("")}</div></div>`;
+  return testa + `<div class="pannello-filtri">
+    <div class="gruppo-filtro"><small>Colore</small><div class="scelte colori-filtro">${COLORI_FILTRO.map(([v, hex]) => `<button data-fk="colore" data-fv="${v}" aria-pressed="${st.colore === v}" aria-label="${v}" title="${v}"><i style="background:${hex}"></i></button>`).join("")}</div></div>
+    ${ok.f ? gruppo("f", "Materiale", Object.entries(NOMI_FILTRI.f)) : ""}
+    ${ok.l ? gruppo("l", "Lunghezza", Object.entries(NOMI_FILTRI.l).filter(([v]) => v !== "media")) : ""}
+    ${ok.w ? gruppo("w", "Maniche", Object.entries(NOMI_FILTRI.w)) : ""}</div>`;
+}
+/** Gestisce un clic dentro i filtri; restituisce true se ha cambiato qualcosa. */
+function clicFiltri(e, st) {
+  const b = e.target.closest("[data-filtri],[data-fk]"); if (!b) return false;
+  if (b.dataset.filtri === "apri") st.aperti = !st.aperti;
+  else if (b.dataset.filtri === "via") Object.assign(st, nuoviFiltri(), { aperti: st.aperti });
+  else st[b.dataset.fk] = st[b.dataset.fk] === b.dataset.fv ? null : b.dataset.fv;
+  return true;
+}
+
+// ======================================================================
 // CAMBIA UN CAPO — alternative per un posto, già filtrate
 // ======================================================================
 const SOTTOFILTRI = {
@@ -426,6 +544,7 @@ const finto = posto => ({ c: posto === "abito" ? "abito" : posto === "sopra" ? "
 function apriCambia(postoIniziale) {
   const filtri = SOTTOFILTRI[postoIniziale].filter(f => !f[3] || f[3] === profilo.genere);
   let scelto = 0, lista = [], mostrati = 0, entro = 0;
+  const filtri2 = nuoviFiltri();
   const corpo = apriFoglio(S.NOME_POSTO[postoIniziale], "");
   const carta = c => `<button class="carta" data-k="${esc(S.chiave(c))}"><img src="${foto(c)}" alt="" loading="lazy">
     <span class="marca">${esc(negozio(c).nome)}</span><b>${esc(c.t)}</b><small>${prezzo(c)}</small>
@@ -438,17 +557,19 @@ function apriCambia(postoIniziale) {
   const rifai = () => {
     const [posto, cat] = filtri[scelto];
     entro = profilo.budget - S.totale(S.metti(outfit, finto(posto)).outfit);     // il budget meno gli altri capi che restano
-    lista = S.alternative(DATI.capi, ctx(), outfit, posto, entro).filter(c => !cat || c.c === cat).filter(c => !outfit[posto] || S.chiave(c) !== S.chiave(outfit[posto]));
+    lista = S.alternative(DATI.capi, ctx(), outfit, posto, entro).filter(c => !cat || c.c === cat).filter(c => !outfit[posto] || S.chiave(c) !== S.chiave(outfit[posto])).filter(c => passaFiltri(c, filtri2));
     mostrati = 0;
     const dentro = lista.filter(c => c.e <= entro).length;
     corpo.innerHTML = (filtri.length > 1 ? `<div class="filtri">${filtri.map((f, i) => `<button class="piccolo" data-f="${i}" aria-pressed="${i === scelto}">${f[2]}</button>`).join("")}</div>` : "") +
+      `<div class="filtri filtri-capo">${htmlFiltri(filtri2, posto)}</div>` +
       `<div class="conta">${entro > 0 ? `Fino a ${euro(entro)} · ${dentro.toLocaleString("it")} capi` : "Budget finito: questi vanno oltre"} · taglia ${S.tagliaPer(profilo, finto(posto))}</div><div class="griglia"></div>`;
-    if (!lista.length) corpo.querySelector(".griglia").innerHTML = `<p class="niente">Niente nella tua taglia, per ora.</p>`; else altri();
+    if (!lista.length) corpo.querySelector(".griglia").innerHTML = `<p class="niente">${quantiFiltri(filtri2) ? "Niente con questi filtri." : "Niente nella tua taglia, per ora."}</p>`; else altri();
     corpo.scrollTop = 0;
   };
   rifai();
   corpo.onclick = e => {
     const f = e.target.closest("[data-f]"); if (f) { scelto = +f.dataset.f; rifai(); return; }
+    if (clicFiltri(e, filtri2)) { const y = corpo.scrollTop; rifai(); corpo.scrollTop = y; return; }
     if (e.target.closest(".altri")) return altri();
     const b = e.target.closest(".carta"); if (!b) return;
     indossa(INDICE.get(b.dataset.k)); chiudiFoglio();
@@ -466,7 +587,7 @@ async function verifica(c) {
   const neg = negozio(c), mia = S.tagliaPer(profilo, c);
   let esito;
   try {
-    const r = await fetch(`https://${neg.dominio}/products/${c.h}.js`);
+    const r = await fetch(`https://${neg.dominio}/products/${c.h}.js?country=IT`);   // stesso mercato del catalogo: prezzi per l'Italia
     if (r.status === 404) esito = { stato: "sparito" };
     else if (!r.ok) throw new Error(r.status);
     else {
@@ -481,7 +602,14 @@ async function verifica(c) {
         for (const t of tt) { const old = per.get(t); if (!old || (!old.available && x.available)) per.set(t, x); }
       }
       const var_ = per.get(mia) || per.get("Unica");
-      esito = { stato: !var_ ? "non-prodotta" : var_.available ? "ok" : "esaurita", variante: var_?.id, taglie: per, prezzoVivo: var_ ? var_.price / 100 : null, unica: !per.has(mia) && per.has("Unica") };
+      // gli altri colori dello stesso capo, con o senza qualcosa di acquistabile nella mia taglia
+      const colori = ic < 0 ? [] : [...new Set(p.variants.map(x => x.options[ic]))].map(nome => {
+        const vv = p.variants.filter(x => x.options[ic] === nome);
+        const nella = vv.some(x => x.available && (c.c === "scarpe" ? S.numeroScarpa(x.options[is], neg.sistema, c.g) === mia : (S.lettera(x.options[is], neg.sistema, c.c) || "").split("/").some(t => t === mia || t === "*")));
+        return { nome, disponibile: vv.some(x => x.available), nella, foto: vv[0]?.featured_image?.src || null };
+      });
+      esito = { stato: !var_ ? "non-prodotta" : var_.available ? "ok" : "esaurita", variante: var_?.id, taglie: per, prezzoVivo: var_ ? var_.price / 100 : null, unica: !per.has(mia) && per.has("Unica"),
+        descrizione: p.description || "", colori };
     }
   } catch { esito = { stato: "ignoto" }; }
   if (esito.stato === "sparito") esclusi.add(k);
@@ -509,7 +637,10 @@ async function apriScheda(c, livello = 1, sola = false) {
       <div class="etichetta"><span>Taglie</span><span id="sc-ora"></span></div>
       <div class="taglie-vive" id="sc-taglie">…</div><div class="riga" id="sc-mia"></div>
       ${dentro || sola ? "" : `<button class="pieno" id="sc-metti">Indossa</button>`}
-      <a class="vuoto" id="sc-sito" href="${linkCapo(c)}" target="_blank" rel="noopener">Vedi sul sito di ${esc(neg.nome)} ↗</a></div>`, livello);
+      <a class="vuoto" id="sc-sito" href="${linkCapo(c)}" target="_blank" rel="noopener">Vedi sul sito di ${esc(neg.nome)} ↗</a></div>
+    <div class="campo" id="sc-colori-box" hidden><div class="etichetta"><span>Colori</span><span>nella tua taglia</span></div><div class="colori-capo" id="sc-colori"></div></div>
+    <div class="campo" id="sc-descr-box" hidden><div class="etichetta"><span>Descrizione</span></div><div class="descrizione" id="sc-descr"></div></div>
+    ${dettagliCapo(c)}`, livello);
   const chiudi = () => { chiudiFoglio(2); chiudiFoglio(1); };
   const q = id => corpo.querySelector(id);
   if (q("#sc-metti")) q("#sc-metti").onclick = () => { chiudi(); mostra("s-camerino"); indossa(c); };
@@ -530,6 +661,36 @@ async function apriScheda(c, livello = 1, sola = false) {
   q("#sc-mia").innerHTML = mia || e.stato === "sparito" ? fraseTaglia(c, e) : "";
   q("#sc-sito").href = linkCapo(c, mia ? e : null);
   if (e.stato === "sparito") { q("#sc-metti")?.remove(); q("#sc-sito").remove(); }
+  // descrizione del negozio (testo semplice, niente HTML esterno nella pagina)
+  const testoDescr = descrizioneTesto(e.descrizione);
+  if (testoDescr) {
+    q("#sc-descr-box").hidden = false;
+    const corta = testoDescr.length > 320 ? testoDescr.slice(0, 300).replace(/\s+\S*$/, "") + "…" : null;
+    q("#sc-descr").innerHTML = `<p>${esc(corta || testoDescr)}</p>${corta ? `<button class="testo-link" id="sc-tutto">Leggi tutto</button>` : ""}`;
+    if (corta) q("#sc-tutto").onclick = () => { q("#sc-descr").innerHTML = `<p>${esc(testoDescr)}</p>`; };
+  }
+  // gli altri colori: quelli che abbiamo nel catalogo si aprono qui, gli altri si vedono sul sito
+  if (e.colori && e.colori.length > 1) {
+    q("#sc-colori-box").hidden = false;
+    q("#sc-colori").innerHTML = e.colori.map(x => {
+      const altro = INDICE.get(`${c.z}|${c.h}|${x.nome}`), questo = x.nome === c.v;
+      const cl = `${questo ? "questo" : ""} ${x.nella ? "si" : "no"}`;
+      return altro && !questo ? `<button class="${cl}" data-k="${esc(S.chiave(altro))}">${altro.x ? `<i style="background:${altro.x}"></i>` : ""}${esc(x.nome)}</button>`
+        : `<span class="${cl}">${questo && c.x ? `<i style="background:${c.x}"></i>` : ""}${esc(x.nome)}</span>`;
+    }).join("");
+    q("#sc-colori").onclick = ev => { const b = ev.target.closest("button[data-k]"); if (b) apriScheda(INDICE.get(b.dataset.k), livello, sola); };
+  }
+}
+/** La descrizione del negozio in testo semplice: si legge come testo, nessun HTML del negozio entra nella pagina. */
+function descrizioneTesto(html) {
+  if (!html) return "";
+  const doc = new DOMParser().parseFromString(html.replace(/<(br|\/p|\/li|\/div|\/h\d)[^>]*>/gi, "$&\n"), "text/html");
+  return (doc.body.textContent || "").split("\n").map(r => r.replace(/\s+/g, " ").trim()).filter(Boolean).join(" · ").slice(0, 2000);
+}
+/** Materiale, lunghezza e maniche come li dice il negozio (dal catalogo). */
+function dettagliCapo(c) {
+  const voci = [c.f && ["Materiale", NOMI_FILTRI.f[c.f]], c.l && ["Lunghezza", NOMI_FILTRI.l[c.l]], c.w && ["Maniche", NOMI_FILTRI.w[c.w]]].filter(Boolean);
+  return voci.length ? `<div class="campo"><div class="voci">${voci.map(([a, b]) => `<span><small>${a}</small>${b}</span>`).join("")}</div></div>` : "";
 }
 
 // ======================================================================
@@ -572,8 +733,17 @@ const TRADUCI = { pelle: /leather|cuir|pelle/, seta: /silk|soie|seta|satin/, lin
   velluto: /velvet|velours|velluto|corduroy/, pizzo: /lace|dentelle|pizzo/, lungo: /long|maxi|lung/, corto: /mini|short|cort/, cappotto: /coat|manteau|cappotto|abrigo/, blazer: /blazer/, trench: /trench/,
   piumino: /puffer|padded|down|doudoune|piumino/, cardigan: /cardigan/, felpa: /sweatshirt|hoodie|felpa/, stivali: /boot|botte|stival/, sneakers: /sneaker|trainer|basket/, sandali: /sandal/ };
 const piano = x => x.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+// ricerca in inglese: le parole si riportano all'italiano prima di capirle
+const DA_INGLESE = [["shoes?", "scarpe"], ["sneakers?|trainers?", "sneakers"], ["boots?|booties", "stivali"], ["sandals?", "sandali"], ["loafers?", "mocassini"], ["heels|pumps", "tacchi"],
+  ["coats?", "cappotto"], ["jackets?", "giacca"], ["puffer|down jacket", "piumino"], ["sweaters?|jumpers?|knit(wear)?|pullovers?", "maglione"], ["cardigans?", "cardigan"], ["hoodies?|sweatshirts?", "felpa"],
+  ["shirts?|blouses?", "camicia"], ["t-?shirts?|tees?|tank tops?|tops?", "top"], ["dress(es)?", "vestito"], ["skirts?", "gonna"], ["trousers|pants|shorts|leggings", "pantaloni"],
+  ["black", "nero"], ["white", "bianco"], ["cream|off-?white|ivory", "panna"], ["beige", "beige"], ["camel", "cammello"], ["brown", "marrone"], ["gr[ae]y", "grigio"], ["navy", "navy"],
+  ["light blue", "azzurro"], ["blue", "blu"], ["green", "verde"], ["olive", "oliva"], ["red", "rosso"], ["burgundy", "bordeaux"], ["pink", "rosa"], ["orange", "arancione"], ["yellow", "giallo"],
+  ["mustard", "senape"], ["purple", "viola"], ["lilac", "lilla"], ["wool", "lana"], ["silk", "seta"], ["linen", "lino"], ["leather", "pelle"], ["cotton", "cotone"], ["velvet", "velluto"], ["lace", "pizzo"],
+  ["long", "lungo"], ["short|mini|cropped", "corto"], ["under|below|less than|up to|max(imum)?", "sotto"]];
+const inglese = t => LINGUA === "en" ? DA_INGLESE.reduce((x, [en, it]) => x.replace(new RegExp(`\\b(${en})\\b`, "g"), it), t) : t;
 function capisci(testo) {
-  const t = piano(testo), q = { cat: null, hex: null, max: null, negozio: -1, parole: [] };
+  const t = inglese(piano(testo)), q = { cat: null, hex: null, max: null, negozio: -1, parole: [] };
   for (const [c, rx] of PAROLE_CAT) if (rx.test(t)) { q.cat = c; break; }
   for (const [w, hex] of Object.entries(PAROLE_COLORE)) if (new RegExp(`\\b${w}\\b`).test(t)) { q.colore = w; q.hex = hex; break; }
   const m = t.match(/(?:sotto|entro|max|massimo|meno di|fino a)\s*(?:i\s*|€\s*)?(\d{2,4})/) || t.match(/(\d{2,4})\s*(?:€|euro)/);
@@ -585,11 +755,12 @@ function capisci(testo) {
 }
 const REPARTI = [["capospalla", "Giacche e cappotti"], ["sopra", "Sopra"], ["sotto", "Sotto"], ["abito", "Abiti", "d"], ["scarpe", "Scarpe"]];
 let reparto = "sopra", listaScopri = [], mostratiScopri = 0, soloTaglia = true;
+const filtriScopri = nuoviFiltri();
 function scopri() {
   const reparti = REPARTI.filter(r => !r[2] || r[2] === profilo.genere), testo = $("c-q").value.trim();
   $("c-filtri").innerHTML = (testo ? "" : reparti.map(r => `<button class="piccolo" data-r="${r[0]}" aria-pressed="${r[0] === reparto}">${r[1]}</button>`).join("")) +
-    `<button class="piccolo" data-t="1" aria-pressed="${soloTaglia}">La mia taglia</button>`;
-  const vaBene = c => !esclusi.has(S.chiave(c)) && (!soloTaglia || S.haTaglia(c, profilo)) && !(profilo.genere === "u" && (c.c === "abito" || c.c === "gonna"));
+    `<button class="piccolo" data-t="1" aria-pressed="${soloTaglia}">La mia taglia</button>` + htmlFiltri(filtriScopri, testo ? "abito" : reparto);
+  const vaBene = c => !esclusi.has(S.chiave(c)) && (!soloTaglia || S.haTaglia(c, profilo)) && !(profilo.genere === "u" && (c.c === "abito" || c.c === "gonna")) && passaFiltri(c, filtriScopri);
   if (testo) {
     const q = capisci(testo), ql = q.hex ? S.lab(q.hex) : null;
     const capito = [q.cat, q.colore, ...q.parole.filter(w => w !== q.cat), q.negozio >= 0 ? DATI.negozi[q.negozio].nome : null, q.max ? `fino a ${euro(q.max)}` : null].filter(Boolean);
@@ -599,7 +770,7 @@ function scopri() {
     $("c-conta").textContent = capito.length ? `${capito.join(" · ")} — ${listaScopri.length.toLocaleString("it")} capi` : "Prova con un capo, un colore, un prezzo o un marchio.";
   } else {
     // senza ricerca: i capi del reparto; con "la mia taglia", prima quelli che stanno bene col look di adesso
-    listaScopri = soloTaglia ? S.alternative(DATI.capi, ctx(), outfit, reparto, Infinity) : DATI.capi.filter(c => S.postoDi(c) === reparto && vaBene(c));
+    listaScopri = soloTaglia ? S.alternative(DATI.capi, ctx(), outfit, reparto, Infinity).filter(c => passaFiltri(c, filtriScopri)) : DATI.capi.filter(c => S.postoDi(c) === reparto && vaBene(c));
     $("c-conta").textContent = `${listaScopri.length.toLocaleString("it")} capi${soloTaglia ? " nella tua taglia" : ""}`;
   }
   mostratiScopri = 0; $("c-griglia").innerHTML = ""; $("c-griglia").parentElement.scrollTop = 0;
@@ -612,7 +783,12 @@ function altriScopri() {
 }
 $("c-form").onsubmit = e => { e.preventDefault(); $("c-q").blur(); scopri(); };
 $("c-q").addEventListener("search", () => { if (!$("c-q").value) scopri(); });
-$("c-filtri").onclick = e => { const b = e.target.closest("button"); if (!b) return; if (b.dataset.r) reparto = b.dataset.r; else soloTaglia = !soloTaglia; scopri(); };
+$("c-filtri").onclick = e => {
+  if (clicFiltri(e, filtriScopri)) return scopri();
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.r) { reparto = b.dataset.r; const ok = filtriPer(reparto); for (const k of ["f", "l", "w"]) if (!ok[k]) filtriScopri[k] = null; } else soloTaglia = !soloTaglia;
+  scopri();
+};
 $("c-griglia").onclick = e => { if (e.target.closest(".altri")) return altriScopri(); const b = e.target.closest(".carta"); if (b) apriScheda(INDICE.get(b.dataset.k)); };
 
 // ======================================================================
@@ -637,10 +813,10 @@ let scelte = { tipo: "umano", animale: "gatto", corpo: "media", colore: "c3", ca
 function usaAvatar(a) {
   profilo.avatar = a;
   if (a && a.creato && !profilo.avatari.some(x => x.url === a.url)) profilo.avatari = [a, ...profilo.avatari].slice(0, 8);
-  vistaAvatar = 0; vestito = true; ricorda(); if (!$("s-camerino").hidden) disegna();
+  vistaAvatar = 0; vistaGiro = 0; vestito = true; ricorda(); if (!$("s-camerino").hidden) disegna();
 }
 async function chiediAvatar(corpo) {
-  const r = await fetch(SERVER + "/avatar", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ genere: profilo.genere, ...corpo }) });
+  const r = await fetch(SERVER + "/avatar", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ lingua: LINGUA, genere: profilo.genere, ...corpo }) });
   const d = await r.json().catch(() => ({}));
   if (!r.ok || !d.url) throw new Error(d.messaggio || "Non ci sono riuscito. Riprova.");
   await new Promise((ok, ko) => { const im = new Image(); im.onload = ok; im.onerror = ko; im.src = d.url; });
@@ -677,7 +853,7 @@ function apriAvatar() {
       const t = scelte.tipo, colori = coloriPer(t);
       if (!colori.includes(scelte.colore)) scelte.colore = colori[0];
       html = gruppo("tipo", OPZ.tipo) + (t === "animale" ? gruppo("animale", OPZ.animale) : "") +
-        `<div class="campo"><div class="etichetta"><span>${t === "animale" ? "Pelo" : t === "robot" ? "Colore" : "Pelle"}</span></div><div class="scelte" data-k="colore">${colori.map(c => `<button data-v="${c}" aria-pressed="${scelte.colore === c}" aria-label="${c}" style="width:40px;background:${TINTE[c]};${scelte.colore === c ? "box-shadow:inset 0 0 0 2px var(--carta);border:2px solid var(--ink)" : ""}"></button>`).join("")}</div></div>` +
+        `<div class="campo"><div class="etichetta"><span>${t === "animale" ? "Pelo" : t === "robot" ? "Colore" : "Carnagione"}</span></div><div class="scelte" data-k="colore">${colori.map(c => `<button data-v="${c}" aria-pressed="${scelte.colore === c}" aria-label="${c}" style="width:40px;background:${TINTE[c]};${scelte.colore === c ? "box-shadow:inset 0 0 0 2px var(--carta);border:2px solid var(--ink)" : ""}"></button>`).join("")}</div></div>` +
         gruppo("corpo", OPZ.corpo) + (t === "animale" || t === "robot" ? "" : gruppo("capelli", OPZ.capelli) + (["rasati", "nessuno"].includes(scelte.capelli) ? "" : gruppo("tinta", OPZ.tinta))) +
         gruppo("stile", OPZ.stile) + `<div class="campo"><button class="pieno" id="av-crea" ${creando ? "disabled" : ""}>${creando ? "Lo sto creando…" : "Crea"}</button><div id="av-esito"></div></div>`;
     }
@@ -702,6 +878,137 @@ function apriAvatar() {
       try { const url = await chiediAvatar({ modo: "personaggio", scelte }); usaAvatar({ url, genere: g, nome, creato: true }); creando = false; schedaAvatar = "modelli"; disegnaScheda(); toast("Avatar pronto"); }
       catch (err) { creando = false; disegnaScheda(); corpo.querySelector("#av-esito").innerHTML = `<p class="male" style="margin:8px 0 0">${esc(err.message)}</p>`; }
     }
+  };
+}
+
+// ======================================================================
+// STYLIST — si scrive cosa si cerca; l'AI capisce la richiesta, i capi li sceglie l'app dal catalogo vero
+// ======================================================================
+const chat = [];                 // [{ chi: "io"|"stylist", testo, capi? }]
+let ultimaRichiesta = null, pensando = false;
+const RX_SCARPE = { stivali: /boot|botte|bottine|stival/i, sneakers: /sneaker|trainer|basket/i, tacchi: /heel|pump|escarpin|d[ée]collet|tacc/i,
+  sandali: /sandal/i, mocassini: /loafer|mocassin|moccasin/i, ballerine: /ballet|ballerin|\bflats?\b/i };
+const RX_GIACCA = { cappotto: /coat|manteau|cappott|abrigo/i, giacca: /jacket|veste|giacc|chaqueta/i, blazer: /blazer/i, piumino: /puffer|padded|down\b|piumin|doudoune/i, trench: /trench/i };
+/** Il capo rispetta quello che lo stylist ha capito per il suo posto? */
+function vaPerRichiesta(c, r) {
+  const p = S.postoDi(c);
+  const pz = p === "abito" ? r.abito_dettagli : p === "capospalla" ? r.giacca_dettagli : r[p];
+  if (r.abito === true && (p === "sopra" || p === "sotto")) return false;
+  if (r.abito === false && p === "abito") return false;
+  if (r.stili?.length && p !== "scarpe" && !r.stili.includes(DATI.negozi[c.n].stile)) return false;   // lo stile chiesto conta davvero (se manca, il posto si allarga)
+  if (r.elegante && p !== "scarpe" && /\b(t-?shirt|tee|hoodie|sweatshirt|sudadera|jogger|sweat ?pants?|track|legging|cargo|active|zip-?up|fleece|windbreaker|anorak|puffer|bomber|sport|felpa|chándal|sudadera|basico tinto)/i.test(c.t)) return false;
+  if (!pz) return true;
+  if (pz.tipo) {
+    if (p === "scarpe" && !RX_SCARPE[pz.tipo]?.test(c.t)) return false;
+    if (p === "capospalla" && !RX_GIACCA[pz.tipo]?.test(c.t)) return false;
+    if ((p === "sopra" || p === "sotto") && c.c !== pz.tipo) return false;
+  }
+  if (pz.colori?.length && !pz.colori.some(n => { const x = COLORI_FILTRO.find(y => y[0] === n); return x && vicinoA(c, x[1]); })) return false;
+  if (pz.materiale && c.f !== pz.materiale) return false;
+  if (pz.lunghezza && !passaFiltri(c, { l: pz.lunghezza })) return false;
+  if (pz.maniche && c.w !== pz.maniche) return false;
+  return true;
+}
+/** Compone il look della richiesta. Un posto senza capi adatti nella taglia si allarga subito (prima di dividere il budget). */
+function lookPerRichiesta(r) {
+  const pezzo = x => x && (x.tipo || x.colori?.length || x.materiale || x.maniche || x.lunghezza);
+  if (r.abito == null && (pezzo(r.sopra) || pezzo(r.sotto))) r = { ...r, abito: false };   // ha chiesto un sopra o un sotto: niente abito al loro posto
+  if (r.abito == null && pezzo(r.abito_dettagli)) r = { ...r, abito: true };
+  const tmp = { ...profilo, budget: r.budget || profilo.budget, stili: r.stili?.length ? r.stili : profilo.stili, conCapospalla: r.giacca ?? profilo.conCapospalla };
+  const c2 = { profilo: tmp, negozi: DATI.negozi, esclusi };
+  const larghi = { abito: r.abito, elegante: r.elegante };     // allargando si lasciano cadere stile e dettagli, non l'occasione
+  const usabile = c => !esclusi.has(S.chiave(c)) && S.haTaglia(c, tmp) && !S.fuoriStagione(c, tmp.freddo);
+  // per ogni posto si allarga per gradi finché ci sono almeno 3 capi nella taglia e nel budget: tutto → senza stile → solo il tipo di capo → solo l'occasione
+  const soloTipo = x => x && { tipo: x.tipo };
+  const gradi = [r, { ...r, stili: [] }, { ...r, stili: [], sopra: soloTipo(r.sopra), sotto: soloTipo(r.sotto), scarpe: soloTipo(r.scarpe), giacca_dettagli: soloTipo(r.giacca_dettagli), abito_dettagli: null }, larghi];
+  const capi = [], allargati = [];
+  for (const p of ["capospalla", "sopra", "sotto", "scarpe", "abito"]) {
+    if ((r.abito === true && (p === "sopra" || p === "sotto")) || (r.abito === false && p === "abito")) continue;
+    const delPosto = DATI.capi.filter(c => S.postoDi(c) === p);
+    let g = 0, lista = [];
+    for (; g < gradi.length; g++) { lista = delPosto.filter(c => vaPerRichiesta(c, gradi[g])); if (lista.filter(c => usabile(c) && c.e <= tmp.budget * 0.5).length >= 3) break; }
+    capi.push(...lista);
+    if (g > 0 && (p !== "abito" || r.abito) && (p !== "capospalla" || tmp.conCapospalla) && (p === "capospalla" ? r.giacca_dettagli : p === "abito" ? r.abito_dettagli : r[p])) allargati.push(p);
+  }
+  let o = S.componi(capi, c2, S.outfitVuoto(), new Set(), S.casuale(++seme));
+  if (S.mancanti(o.outfit).length) {        // il budget non bastava coi capi richiesti: si completa coi più vicini
+    const tutti = DATI.capi.filter(c => vaPerRichiesta(c, larghi));
+    const posti = new Set(["capospalla", "sopra", "sotto", "scarpe", "abito"].filter(p => o.outfit[p]));
+    const tenuti = S.componi(tutti, c2, o.outfit, posti, S.casuale(++seme));
+    o = !S.mancanti(tenuti.outfit).length ? tenuti : S.componi([...capi, ...tutti], c2, S.outfitVuoto(), new Set(), S.casuale(++seme));   // se no si riparte da capo
+    for (const p of S.POSTI) if (o.outfit[p] && !vaPerRichiesta(o.outfit[p], r) && !allargati.includes(p)) allargati.push(p);
+  }
+  return { ...o, budget: tmp.budget, allargati: allargati.filter(p => o.outfit[p]) };
+}
+function apriStylist() {
+  const corpo = apriFoglio("Stylist", "");
+  const disegnaChat = () => {
+    const esempi = profilo.genere === "u" ? ["Un look da ufficio sotto 300 €", "Qualcosa per una cena, scarpe nere", "Weekend in montagna"] : ["Un look da ufficio sotto 300 €", "Una cena elegante, stivali neri", "Jeans e maglione di lana per il weekend"];
+    corpo.innerHTML = `<div class="chat" id="chat">${chat.length ? chat.map((m, i) => `<div class="msg ${m.chi}"${m.chi === "io" ? ' translate="no"' : ""}><p>${esc(m.testo)}</p>${m.capi ? `<div class="strip">${m.capi.map(k => INDICE.get(k)).filter(Boolean).map(c => `<img src="${foto(c, 120)}" alt="${esc(c.t)}">`).join("")}</div><button class="piccolo" data-rimetti="${i}">Indossa questo look</button>` : ""}</div>`).join("")
+      : `<p class="sotto" style="margin:0 0 10px">Scrivi cosa cerchi: l'occasione, i colori, un capo, il budget. Compongo il look con capi veri, nella tua taglia.</p><div class="esempi">${esempi.map(x => `<button class="piccolo" data-esempio>${esc(x)}</button>`).join("")}</div>`}
+      ${pensando ? `<div class="msg stylist"><p class="attesa-testo">Sto pensando…</p></div>` : ""}</div>
+      <form class="cerca chat-form" id="chat-form"><input id="chat-q" autocomplete="off" placeholder="Scrivi qui…" aria-label="Scrivi allo stylist" ${pensando ? "disabled" : ""}><button aria-label="Invia" ${pensando ? "disabled" : ""}>→</button></form>`;
+    corpo.scrollTop = corpo.scrollHeight;
+    corpo.querySelector("#chat-form").onsubmit = e => { e.preventDefault(); manda(corpo.querySelector("#chat-q").value); };
+  };
+  const manda = async testo => {
+    testo = testo.trim(); if (!testo || pensando) return;
+    chat.push({ chi: "io", testo }); pensando = true; disegnaChat();
+    try {
+      const r = await fetch(SERVER + "/chiedi", { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ testo, genere: profilo.genere, budget: profilo.budget, lingua: LINGUA, storia: ultimaRichiesta }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.richiesta) throw new Error(d.messaggio || "Non ci sono riuscito. Riprova.");
+      ultimaRichiesta = d.richiesta;
+      const l = lookPerRichiesta(d.richiesta), capi = S.capiDi(l.outfit);
+      let testoR = d.risposta || "Ecco il look.";
+      if (!capi.length) testoR += " " + tr("Però con queste richieste non trovo capi nella tua taglia. Prova ad allargare un po'.");
+      else {
+        if (l.budget !== profilo.budget) { profilo.budget = l.budget; }
+        const prima = outfit; outfit = l.outfit; manca = l.manca; bloccati.clear(); ricorda(); disegna();
+        const en = LINGUA === "en", nomi = l.allargati.map(p => tr(S.NOME_POSTO[p]).toLowerCase()).join(en ? " and " : " e ");
+        testoR += en ? ` (${capi.length} items, ${euro(S.totale(outfit))})` : ` (${capi.length} capi, ${euro(S.totale(outfit))})`;
+        if (l.allargati.length) testoR += " " + (en ? `For the ${nomi} there wasn't exactly what you asked for: I picked the closest.` : `Per ${nomi} non c'era esattamente quello che chiedi: ho messo il più vicino.`);
+        chat.push({ chi: "stylist", testo: testoR, capi: capi.map(S.chiave) });
+        pensando = false; disegnaChat();
+        return;
+      }
+      chat.push({ chi: "stylist", testo: testoR });
+    } catch (e) { chat.push({ chi: "stylist", testo: e.message || "Non ci sono riuscito. Riprova." }); }
+    pensando = false; disegnaChat();
+  };
+  disegnaChat();
+  corpo.onclick = e => {
+    const es = e.target.closest("[data-esempio]"); if (es) return manda(es.textContent);
+    const ri = e.target.closest("[data-rimetti]");
+    if (ri) {
+      outfit = S.outfitVuoto();
+      for (const k of chat[+ri.dataset.rimetti].capi) { const c = INDICE.get(k); if (c) outfit = S.metti(outfit, c).outfit; }
+      bloccati.clear(); manca = []; ricorda(); chiudiFoglio(); mostra("s-camerino"); disegna();
+    }
+  };
+}
+$("chiedi").onclick = () => { if (DATI) apriStylist(); };
+
+// ======================================================================
+// COME FUNZIONA — la prima volta nel camerino, poi dall'account
+// ======================================================================
+const PASSI_GUIDA = [
+  ["Il tuo camerino", "Al centro c'è il tuo avatar. A destra i capi del look: giacca, sopra, sotto, scarpe. Sono capi veri, in vendita adesso nella tua taglia."],
+  ["Cambia un capo", "Tocca una casella a destra: vedi il capo, le taglie disponibili adesso, i colori e la descrizione. Da lì puoi cambiarlo, bloccarlo o toglierlo."],
+  ["Chiedi allo stylist", "Scrivi cosa ti serve, per esempio \"un look da ufficio sotto 300 €\": lo stylist compone il look per te."],
+  ["Prova il look", "Con il look completo tocca \"Prova il look\": in circa 15 secondi l'avatar lo indossa. Con le frecce in basso lo giri: di lato e da dietro. La lente ingrandisce."],
+  ["Il tuo avatar", "L'icona della figurina cambia l'avatar: un modello pronto, uno creato dalla tua foto o un personaggio inventato."],
+  ["Compra", "\"Compra\" apre il sito di ogni marchio con la tua taglia già scelta. Il cuore salva il look, la freccia lo condivide."],
+];
+function apriGuida(i = 0) {
+  const [titolo, testo] = PASSI_GUIDA[i];
+  const corpo = apriFoglio("Come funziona", `<div class="guida"><small>${i + 1} / ${PASSI_GUIDA.length}</small><h3>${esc(titolo)}</h3><p>${esc(testo)}</p>
+    <div class="tre" style="grid-template-columns:1fr 1fr">${i ? `<button class="vuoto" id="g-indietro">Indietro</button>` : `<button class="vuoto" id="g-salta">Salta</button>`}<button class="pieno" id="g-avanti">${i < PASSI_GUIDA.length - 1 ? "Avanti" : "Inizia"}</button></div></div>`);
+  corpo.onclick = e => {
+    if (e.target.closest("#g-avanti")) return i < PASSI_GUIDA.length - 1 ? apriGuida(i + 1) : chiudiFoglio();
+    if (e.target.closest("#g-indietro")) return apriGuida(i - 1);
+    if (e.target.closest("#g-salta")) return chiudiFoglio();
   };
 }
 
@@ -773,3 +1080,4 @@ async function apriCondiviso(link) {
 const condiviso = leggiCondiviso();
 if (condiviso) apriCondiviso(condiviso);
 else if (profilo.pronto && profilo.genere) entra(); else apriProfilo();
+if (location.hostname === "localhost") window.__cam = { lookPerRichiesta, vaPerRichiesta, S, get DATI() { return DATI; }, profilo };   // solo per le prove in locale

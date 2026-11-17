@@ -84,7 +84,7 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 .budget.sfora .resto { color: var(--rosso); }
 .palco { flex: 1; min-height: 0; position: relative; overflow: hidden; background: var(--carta); touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab; }
 .palco.gira { cursor: grabbing; }
-.palco .avatar { position: absolute; inset: 0 0 18px 0; width: 100%; height: calc(100% - 18px); object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
+.palco .avatar { position: absolute; inset: 0 0 40px 0; width: 100%; height: calc(100% - 40px); object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
 .palco .avatar.specchio { transform: scaleX(-1); }
 .punti { position: absolute; left: 0; right: 0; bottom: 4px; display: flex; gap: 5px; justify-content: center; }
 .punti i { width: 5px; height: 5px; border-radius: 50%; background: var(--riga); }
@@ -92,7 +92,7 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 .pillola { position: absolute; left: max(20px, env(safe-area-inset-left, 0px)); top: 6px; font-size: 11px; color: var(--ink-2); background: var(--carta); border: 1px solid var(--riga); padding: 4px 8px; }
 .pillola.nera { background: var(--ink); color: var(--carta); border-color: var(--ink); font-size: 13px; padding: 8px 14px; }
 .palco .avatar.attesa { opacity: .45; transition: opacity .3s; }
-.colonna { position: absolute; right: max(14px, env(safe-area-inset-right, 0px)); top: 6px; bottom: 26px; display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+.colonna { position: absolute; right: max(14px, env(safe-area-inset-right, 0px)); top: 6px; bottom: 44px; display: flex; flex-direction: column; gap: 6px; justify-content: center; }
 .casella { position: relative; width: 62px; height: 78px; border: 1px solid var(--riga); background: var(--velo); overflow: hidden; }
 .casella img { width: 100%; height: 100%; object-fit: cover; object-position: center top; pointer-events: none; }
 .casella.scarpe img { object-fit: contain; object-position: center; }
@@ -100,7 +100,7 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 .casella.libera { border-style: dashed; border-color: var(--ink-3); display: grid; place-items: center; font-size: 22px; color: var(--ink-3); background: var(--carta); }
 .casella .lucchetto { position: absolute; top: 3px; right: 3px; width: 16px; height: 16px; background: var(--ink); color: var(--carta); display: grid; place-items: center; }
 .casella .lucchetto svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 2; }
-.attrezzi { position: absolute; left: max(20px, env(safe-area-inset-left, 0px)); bottom: 26px; display: grid; gap: 6px; }
+.attrezzi { position: absolute; left: max(20px, env(safe-area-inset-left, 0px)); bottom: 44px; display: grid; gap: 6px; }
 .attrezzi .icona { background: var(--carta); }
 .attrezzi .icona[aria-pressed="true"] svg { fill: currentColor; }
 .avviso { flex: none; margin: 0; padding: 8px 0 0; font-size: 13px; }
@@ -180,6 +180,51 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 .toast.su { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 .toast button { color: var(--carta); text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .foglio, .toast, .budget .barra i { transition: none; } }
+
+/* --- 17/11: stylist, frecce, zoom, filtri, colori e descrizione del capo, guida --- */
+.chiedi { width: 100%; display: flex; align-items: center; gap: 8px; text-align: left; border: 1px solid var(--riga); background: var(--carta); padding: 9px 12px; margin: 6px 0 2px; font: inherit; color: var(--ink); cursor: pointer; }
+.chiedi .stella { font-size: 14px; }
+.chiedi small { color: var(--ink-3); font-size: 12px; margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.giro { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; gap: 10px; pointer-events: none; }
+.giro button { pointer-events: auto; font-size: 22px; line-height: 1; width: 36px; height: 36px; background: var(--carta); border: 1px solid var(--riga); }
+.giro button:disabled { opacity: .4; }
+.giro .nome-vista { font-size: 11px; color: var(--ink-2); min-width: 76px; text-align: center; }
+.punti-giro { display: flex; gap: 5px; } .punti-giro i { width: 5px; height: 5px; border-radius: 50%; background: var(--riga); } .punti-giro i.ora { background: var(--ink); }
+.zoom-vista { position: fixed; inset: 0; z-index: 50; background: var(--carta); overflow: hidden; touch-action: none; }
+.zoom-vista img { width: 100%; height: 100%; object-fit: contain; transition: transform .2s; cursor: zoom-in; -webkit-user-drag: none; user-select: none; }
+.zoom-vista img.specchio { transform: scaleX(-1); }
+.zoom-vista.dentro img { transform: scale(2.6); cursor: move; transition: transform-origin 0s, transform .2s; }
+.zoom-vista.dentro img.specchio { transform: scaleX(-1) scale(2.6); }
+.zoom-vista button { position: absolute; top: max(12px, env(safe-area-inset-top, 0px)); right: 12px; background: var(--carta); }
+.zoom-vista small { position: absolute; bottom: max(14px, env(safe-area-inset-bottom, 0px)); left: 0; right: 0; text-align: center; color: var(--ink-3); font-size: 12px; }
+.filtri-capo, #c-filtri { flex-wrap: wrap; }
+.pannello-filtri { flex-basis: 100%; display: grid; gap: 10px; padding: 10px 0 4px; border-top: 1px solid var(--riga); margin-top: 4px; }
+.pannello-filtri .scelte button { padding: 6px 9px; font-size: 12px; min-height: 0; }
+.chiedi > span:nth-child(2) { white-space: nowrap; }
+.gruppo-filtro small { display: block; font-size: 11px; color: var(--ink-3); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .08em; }
+.colori-filtro button { width: 30px; height: 30px; padding: 3px; min-width: 0; }
+.colori-filtro button i { display: block; width: 100%; height: 100%; border: 1px solid var(--riga); }
+.colori-filtro button[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 1px; }
+.colori-capo { display: flex; flex-wrap: wrap; gap: 6px; }
+.colori-capo > * { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 5px 8px; border: 1px solid var(--riga); background: var(--carta); color: var(--ink); font-family: inherit; }
+.colori-capo i { width: 12px; height: 12px; border: 1px solid var(--riga); display: inline-block; }
+.colori-capo .questo { border-color: var(--ink); }
+.colori-capo .no { color: var(--ink-3); text-decoration: line-through; }
+.colori-capo button { cursor: pointer; }
+.descrizione p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.voci { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; }
+.voci small { display: block; font-size: 11px; color: var(--ink-3); }
+.chat { display: grid; gap: 10px; padding-bottom: 76px; }
+.chat .msg { max-width: 88%; }
+.chat .msg p { margin: 0; padding: 9px 12px; font-size: 14px; line-height: 1.45; }
+.chat .msg.io { justify-self: end; } .chat .msg.io p { background: var(--ink); color: var(--carta); }
+.chat .msg.stylist p { background: var(--velo); border: 1px solid var(--riga); }
+.chat .msg .strip { display: flex; gap: 4px; margin: 6px 0; } .chat .msg .strip img { width: 54px; height: 72px; object-fit: cover; border: 1px solid var(--riga); }
+.chat .esempi { display: flex; flex-wrap: wrap; gap: 6px; }
+.chat .attesa-testo { color: var(--ink-3); }
+.chat-form { position: sticky; bottom: 0; background: var(--carta); padding: 10px 0 max(10px, env(safe-area-inset-bottom, 0px)); margin: 0; }
+.guida { display: grid; gap: 10px; padding-top: 6px; }
+.guida small { color: var(--ink-3); font-size: 12px; } .guida h3 { margin: 0; font-size: 20px; font-weight: 500; } .guida p { margin: 0 0 8px; font-size: 15px; line-height: 1.5; color: var(--ink-2); }
 </style>
 </head>
 <body>
@@ -199,6 +244,7 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
     <div class="budget lati" id="budget"></div>
     <div class="palco" id="palco"></div>
     <p class="avviso lati" id="avviso" hidden></p>
+    <div class="lati" style="flex:none"><button class="chiedi" id="chiedi"><span class="stella">✦</span><span>Chiedi allo stylist</span><small>«un look da ufficio sotto 300 €»</small></button></div>
     <div class="azioni lati">
       <button class="vuoto" id="altro">Nuovo look</button>
       <button class="pieno" id="principale">Compra</button>
@@ -243,6 +289,8 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
     <div class="foglio-testa lati"><h2 id="foglio2-titolo"></h2><button class="icona" id="foglio2-chiudi" aria-label="Chiudi">✕</button></div>
     <div class="foglio-corpo lati" id="foglio2-corpo"></div>
   </div>
+
+  <div class="zoom-vista" id="zoom-vista" hidden><img alt="Avatar ingrandito" draggable="false"><button class="icona" aria-label="Chiudi">✕</button><small>Tocca per ingrandire · trascina per muoverti</small></div>
 
   <div class="toast" id="toast" role="status"></div>
 </div>

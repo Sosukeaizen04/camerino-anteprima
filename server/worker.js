@@ -6,7 +6,10 @@
 //   POST /prova   { avatar, capi: [{posto, url}] }                       → { url }   l'avatar con il look addosso
 //   POST /avatar  { modo: "foto", genere, foto: "data:image/jpeg;base64,…" } → { url }   avatar dalla foto della persona
 //   POST /avatar  { modo: "personaggio", genere, scelte: {…} }            → { url }   personaggio inventato
+//   POST /gira    { immagine, vista: "destra"|"sinistra"|"dietro" }        → { url }   la stessa figura vista da un lato o da dietro
+//   POST /chiedi  { testo, genere, budget, lingua, storia? }               → { risposta, richiesta }   lo stylist: capisce cosa si cerca
 //   GET  /img/<id>.jpg                                                     immagini conservate
+// Tutte le richieste accettano `lingua` ("it" | "en"): i messaggi per l'utente tornano in quella lingua.
 //
 // La foto della persona NON viene conservata: passa a fal solo per generare l'avatar (privacy da sistemare prima di aprire a tutti).
 // Variabili: FAL_KEY (segreto), MODELLO (modifica), MODELLO_TESTO (da testo), LIMITE_PERSONA, LIMITE_AVATAR, LIMITE_GIORNO, ORIGINI, BASE_AVATAR; KV: MEMORIA.
@@ -51,6 +54,21 @@ function testoProva(capi) {
     `Keep the figure's face, head, hair, skin, body shape, height, pose and drawing style identical, full body from head to toe visible, same plain white background, same light.`;
 }
 
+// --- messaggi per l'utente, in italiano e inglese
+const MSG = {
+  limiteAvatar: ["Per oggi hai creato abbastanza avatar. Domani si riparte.", "You've made enough avatars for today. Try again tomorrow."],
+  limiteProva: ["Per oggi hai provato abbastanza look. Domani si riparte.", "You've tried on enough looks for today. Try again tomorrow."],
+  pieno: ["Oggi il camerino è pieno. Riprova domani.", "The fitting room is full today. Try again tomorrow."],
+  nonRisponde: ["Il servizio non risponde. Riprova tra poco.", "The service isn't responding. Try again shortly."],
+  credito: ["Il credito è finito.", "The credit has run out."],
+  immagine: ["Questa immagine non si può usare. Prova con un'altra.", "This image can't be used. Try another one."],
+  riprova: ["Non ci sono riuscito. Riprova.", "That didn't work. Please try again."],
+  vestire: ["Non sono riuscito a vestire l'avatar. Riprova.", "I couldn't dress the avatar. Please try again."],
+  girare: ["Non sono riuscito a girare l'avatar. Riprova.", "I couldn't turn the avatar. Please try again."],
+  capire: ["Non ho capito. Prova a dirlo in un altro modo.", "I didn't get that. Try saying it another way."],
+};
+const msg = (k, lingua) => MSG[k][lingua === "en" ? 1 : 0];
+
 // --- utilità
 const intestazioni = origine => ({ "access-control-allow-origin": origine || "null", "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "content-type", vary: "origin" });
 const risposta = (corpo, stato, origine) => new Response(JSON.stringify(corpo), { status: stato, headers: { "content-type": "application/json", ...intestazioni(origine) } });
@@ -64,10 +82,10 @@ const nuovoId = () => [...crypto.getRandomValues(new Uint8Array(12))].map(b => b
 async function conta(env, req, tipo, limite) {
   const giorno = new Date().toISOString().slice(0, 10);
   const chi = await impronta((req.headers.get("cf-connecting-ip") || "?") + giorno);
-  const kP = `conta:${tipo}:${giorno}:${chi}`, kG = `conta:${giorno}`;
+  const kP = `conta:${tipo}:${giorno}:${chi}`, kG = tipo === "chat" ? `conta:chat:${giorno}` : `conta:${giorno}`;   // i messaggi allo stylist costano ~100 volte meno: contatore a parte
   const [nP, nG] = (await Promise.all([env.MEMORIA.get(kP), env.MEMORIA.get(kG)])).map(v => +v || 0);
-  if (nP >= limite) return { no: tipo === "avatar" ? "Per oggi hai creato abbastanza avatar. Domani si riparte." : "Per oggi hai provato abbastanza look. Domani si riparte." };
-  if (nG >= +env.LIMITE_GIORNO) return { no: "Oggi il camerino è pieno. Riprova domani." };
+  if (nP >= limite) return { no: tipo === "avatar" ? "limiteAvatar" : "limiteProva" };
+  if (nG >= +env.LIMITE_GIORNO * (tipo === "chat" ? 10 : 1)) return { no: "pieno" };
   await Promise.all([env.MEMORIA.put(kP, String(nP + 1), { expirationTtl: 2 * GIORNO }), env.MEMORIA.put(kG, String(nG + 1), { expirationTtl: 2 * GIORNO })]);
   return { restano: Math.max(0, limite - nP - 1), annulla: () => env.MEMORIA.put(kP, String(nP), { expirationTtl: 2 * GIORNO }) };
 }
@@ -77,14 +95,14 @@ async function genera(env, modello, corpo) {
   try {
     r = await fetch(`https://fal.run/${modello}`, { method: "POST", headers: { authorization: `Key ${env.FAL_KEY}`, "content-type": "application/json" },
       body: JSON.stringify({ num_images: 1, aspect_ratio: "3:4", resolution: "1K", output_format: "jpeg", ...corpo }) });
-  } catch { return { errore: "Il servizio non risponde. Riprova tra poco.", nonPagato: true }; }
+  } catch { return { errore: "nonRisponde", nonPagato: true }; }
   if (!r.ok) {
     const testo = (await r.text()).slice(0, 300);
     console.log("fal", r.status, testo);
-    return { errore: r.status === 403 || /balance|credit|locked/i.test(testo) ? "Il credito è finito." : /safety|content|policy/i.test(testo) ? "Questa immagine non si può usare. Prova con un'altra." : "Non ci sono riuscito. Riprova.", nonPagato: r.status >= 500 };
+    return { errore: r.status === 403 || /balance|credit|locked/i.test(testo) ? "credito" : /safety|content|policy/i.test(testo) ? "immagine" : "riprova", nonPagato: r.status >= 500 };
   }
   const out = await r.json();
-  return out?.images?.[0]?.url ? { url: out.images[0].url } : { errore: "Non ci sono riuscito. Riprova." };
+  return out?.images?.[0]?.url ? { url: out.images[0].url } : { errore: "riprova" };
 }
 /** Copia l'immagine nella memoria del server e restituisce il suo indirizzo stabile. */
 async function conserva(env, sede, url, tipo, giorni) {
@@ -93,6 +111,81 @@ async function conserva(env, sede, url, tipo, giorni) {
   const id = nuovoId();
   await env.MEMORIA.put(`file:${id}`, await r.arrayBuffer(), { expirationTtl: giorni * GIORNO, metadata: { tipo } });
   return `${sede}/img/${id}.jpg`;
+}
+
+// --- vista da un lato o da dietro: stessa figura, stessi vestiti
+const VISTE = {
+  destra: "turned 90 degrees so that we see the figure's right side in profile",
+  sinistra: "turned 90 degrees so that we see the figure's left side in profile",
+  dietro: "turned 180 degrees so that we see the figure from behind (back view, the face is not visible)",
+};
+const testoGira = vista => `Image 1 shows a figure standing on a plain white background. Show this exact same figure ${VISTE[vista]}. ` +
+  `Keep everything identical: the same person or character, body shape, height, hair, skin, the same clothes and shoes with the same colours, fabrics, ` +
+  `patterns, lengths and fit, the same drawing style. Full body from head to toe visible, arms relaxed, same plain white background, same soft light. Add nothing.`;
+
+// --- lo stylist: dal testo libero a una richiesta che l'app sa comporre col catalogo vero (l'AI non inventa capi)
+const STILI = ["Minimal", "Parigino", "Lusso", "Romantico", "Boho", "Colore", "Italiano", "Maglieria", "Sostenibile", "Denim", "Curvy", "Sportivo", "Streetwear", "Sera", "Rock"];
+const COLORI = ["nero", "bianco", "panna", "beige", "cammello", "marrone", "grigio", "blu", "navy", "azzurro", "verde", "oliva", "rosso", "bordeaux", "rosa", "arancione", "giallo", "viola", "lilla"];
+const MATERIALI = ["cashmere", "lana", "seta", "lino", "pelle", "denim", "velluto", "cotone", "viscosa"];
+const SISTEMA_STYLIST = `You are the stylist of Camerino, a fashion app that builds complete outfits from real products of online shops.
+The user writes what they want. Turn it into a request the app can search. You never name products or shops: the app picks real ones.
+Answer ONLY with JSON, no markdown:
+{"risposta": string, "budget": number|null, "stili": string[], "elegante": boolean, "giacca": boolean|null, "abito": boolean|null,
+ "sopra": {"tipo": "maglia"|"camicia"|"top"|null, "colori": string[], "materiale": string|null, "maniche": "senza"|"corte"|"3/4"|"lunghe"|null} | null,
+ "sotto": {"tipo": "pantaloni"|"jeans"|"gonna"|null, "colori": string[], "materiale": string|null, "lunghezza": "corta"|"normale"|"lunga"|null} | null,
+ "abito_dettagli": {"colori": string[], "materiale": string|null, "lunghezza": "corta"|"normale"|"lunga"|null, "maniche": "senza"|"corte"|"3/4"|"lunghe"|null} | null,
+ "scarpe": {"tipo": "stivali"|"sneakers"|"tacchi"|"sandali"|"mocassini"|"ballerine"|null, "colori": string[]} | null,
+ "giacca_dettagli": {"tipo": "cappotto"|"giacca"|"blazer"|"piumino"|"trench"|null, "colori": string[], "materiale": string|null} | null}
+Rules:
+- "risposta": one or two short friendly sentences in the language required below, saying what you are putting together (no product names, no prices you can't know). If the request is not about clothes, say kindly what you can do.
+- "budget": total euros for the whole outfit only if the user says it, else null.
+- "stili": zero to two of ${JSON.stringify(STILI)} that fit the request (office → Minimal/Italiano, evening/party → Sera, sport → Sportivo, etc.).
+- "elegante": true for dinners, evenings, ceremonies, office/work, dates, theatre: then also choose a fitting "tipo" for each piece (e.g. camicia or maglia, pantaloni or gonna, tacchi or stivali or mocassini).
+- colours only from ${JSON.stringify(COLORI)}; materials only from ${JSON.stringify(MATERIALI)}. Leave a field null or [] if the user doesn't ask; do not over-constrain.
+- "giacca": true if a coat/jacket is wanted or the weather is cold, false if explicitly not, else null. "abito": true if a dress is wanted (women only), false if trousers/skirt are wanted, else null.
+- If the user only changes one thing ("make it cheaper", "darker shoes"), keep the rest of the previous request.`;
+
+async function chiediStylist(env, testo, genere, budget, lingua, storia) {
+  const contesto = `User: ${genere === "u" ? "man" : "woman"}. Current outfit budget: ${budget} euro. Write "risposta" in ${lingua === "en" ? "English" : "Italian"}, unless the user clearly writes in another language (then use theirs).` +
+    (storia ? `\nPrevious request (JSON): ${JSON.stringify(storia).slice(0, 1500)}` : "");
+  let r;
+  try {
+    r = await fetch("https://fal.run/openrouter/router", { method: "POST", headers: { authorization: `Key ${env.FAL_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify({ model: env.MODELLO_CHAT, system_prompt: SISTEMA_STYLIST, prompt: `${contesto}\n\nUser message: ${testo}`, temperature: 0.3, max_tokens: 600 }) });
+  } catch { return { errore: "nonRisponde" }; }
+  if (!r.ok) { console.log("chat", r.status, (await r.text()).slice(0, 300)); return { errore: r.status === 403 ? "credito" : "riprova" }; }
+  const out = await r.json();
+  const testoOut = String(out?.output || "").replace(/^```(?:json)?\s*|\s*```$/g, "");
+  let j;
+  try { j = JSON.parse(testoOut.slice(testoOut.indexOf("{"), testoOut.lastIndexOf("}") + 1)); } catch { return { errore: "capire" }; }
+  // si tiene solo ciò che l'app conosce
+  const lista = (v, ammessi) => Array.isArray(v) ? v.filter(x => ammessi.includes(x)).slice(0, 3) : [];
+  const una = (v, ammessi) => ammessi.includes(v) ? v : null;
+  const pezzo = (o, campi) => o && typeof o === "object" ? Object.fromEntries(Object.entries(campi).map(([k, amm]) => [k, k === "colori" ? lista(o[k], COLORI) : una(o[k], amm)])) : null;
+  const MAN = ["senza", "corte", "3/4", "lunghe"], LUN = ["corta", "normale", "lunga"];
+  return {
+    risposta: String(j.risposta || "").slice(0, 400),
+    richiesta: {
+      budget: Number.isFinite(+j.budget) && +j.budget >= 30 && +j.budget <= 20000 ? Math.round(+j.budget) : null,
+      stili: lista(j.stili, STILI).slice(0, 2), elegante: j.elegante === true, giacca: typeof j.giacca === "boolean" ? j.giacca : null, abito: genere === "d" && typeof j.abito === "boolean" ? j.abito : genere === "u" ? false : null,
+      sopra: pezzo(j.sopra, { tipo: ["maglia", "camicia", "top"], colori: 0, materiale: MATERIALI, maniche: MAN }),
+      sotto: pezzo(j.sotto, { tipo: ["pantaloni", "jeans", "gonna"], colori: 0, materiale: MATERIALI, lunghezza: LUN }),
+      abito: null,
+      abito_dettagli: genere === "d" ? pezzo(j.abito_dettagli, { colori: 0, materiale: MATERIALI, lunghezza: LUN, maniche: MAN }) : null,
+      scarpe: pezzo(j.scarpe, { tipo: ["stivali", "sneakers", "tacchi", "sandali", "mocassini", "ballerine"], colori: 0 }),
+      giacca_dettagli: pezzo(j.giacca_dettagli, { tipo: ["cappotto", "giacca", "blazer", "piumino", "trench"], colori: 0, materiale: MATERIALI }),
+    },
+    costo: out?.usage?.cost,
+  };
+}
+
+/** L'immagine è nostra? Base del Camerino, oppure un avatar o una prova conservati qui. */
+async function immagineNostra(env, sede, url, tipi) {
+  if (typeof url !== "string") return false;
+  if (url.startsWith(env.BASE_AVATAR)) return true;
+  const mio = url.match(new RegExp(`^${sede.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}/img/([0-9a-f]{24})\\.jpg$`));
+  if (!mio) return false;
+  return tipi.includes((await env.MEMORIA.getWithMetadata(`file:${mio[1]}`, { type: "stream" })).metadata?.tipo);
 }
 
 export default {
@@ -109,10 +202,24 @@ export default {
       return new Response(value, { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=2592000, immutable", "access-control-allow-origin": "*", "x-tipo": metadata?.tipo || "" } });
     }
     if (url.pathname === "/salute") return risposta({ ok: true }, 200, ok ? origine : null);
-    if (req.method !== "POST" || !["/prova", "/avatar"].includes(url.pathname)) return risposta({ errore: "non trovato" }, 404, ok ? origine : null);
+    if (req.method !== "POST" || !["/prova", "/avatar", "/gira", "/chiedi"].includes(url.pathname)) return risposta({ errore: "non trovato" }, 404, ok ? origine : null);
     if (!ok) return risposta({ errore: "origine non ammessa" }, 403, null);
     let dati;
     try { dati = await req.json(); } catch { return risposta({ errore: "richiesta non valida" }, 400, origine); }
+    const lingua = dati?.lingua === "en" ? "en" : "it";
+    const errore = (k, stato) => risposta({ errore: k, messaggio: msg(k, lingua) }, stato, origine);
+
+    // ================= STYLIST =================
+    if (url.pathname === "/chiedi") {
+      const { testo, genere, budget, storia } = dati || {};
+      if (typeof testo !== "string" || !testo.trim() || testo.length > 500) return risposta({ errore: "testo non valido" }, 400, origine);
+      if (!["d", "u"].includes(genere)) return risposta({ errore: "genere non valido" }, 400, origine);
+      const c = await conta(env, req, "chat", +env.LIMITE_CHAT);
+      if (c.no) return errore(c.no === "pieno" ? "pieno" : "limiteProva", 429);
+      const r = await chiediStylist(env, testo.trim(), genere, Math.round(+budget) || 400, lingua, storia);
+      if (r.errore) { await c.annulla(); return errore(r.errore, 502); }
+      return risposta(r, 200, origine);
+    }
 
     // ================= AVATAR =================
     if (url.pathname === "/avatar") {
@@ -131,21 +238,36 @@ export default {
       } else return risposta({ errore: "modo non valido" }, 400, origine);
 
       const c = await conta(env, req, "avatar", +env.LIMITE_AVATAR);
-      if (c.no) return risposta({ errore: "limite", messaggio: c.no }, 429, origine);
+      if (c.no) return errore(c.no, 429);
       const g = await genera(env, modello, corpo);
-      if (g.errore) { if (g.nonPagato) await c.annulla(); return risposta({ errore: "servizio", messaggio: g.errore }, 502, origine); }
+      if (g.errore) { if (g.nonPagato) await c.annulla(); return errore(g.errore, 502); }
       try {
         const indirizzo = await conserva(env, sede, g.url, "avatar", 365);
         return risposta({ url: indirizzo, restano: c.restano }, 200, origine);
-      } catch { return risposta({ errore: "servizio", messaggio: "Non ci sono riuscito. Riprova." }, 502, origine); }
+      } catch { return errore("riprova", 502); }
+    }
+
+    // ================= GIRA: vista da destra, sinistra o dietro (una immagine per vista, solo quando la si chiede) =================
+    if (url.pathname === "/gira") {
+      const { immagine, vista } = dati || {};
+      if (!VISTE[vista]) return risposta({ errore: "vista non valida" }, 400, origine);
+      if (!await immagineNostra(env, sede, immagine, ["avatar", "prova"])) return risposta({ errore: "immagine non ammessa" }, 400, origine);
+      const chiave = "gira:" + await impronta(JSON.stringify([env.MODELLO, VERSIONE, immagine, vista]));
+      const gia = await env.MEMORIA.get(chiave);
+      if (gia) return risposta({ url: gia, memoria: true }, 200, origine);
+      const c = await conta(env, req, "prova", +env.LIMITE_PERSONA);
+      if (c.no) return errore(c.no, 429);
+      const g = await genera(env, env.MODELLO, { prompt: testoGira(vista), image_urls: [immagine] });
+      if (g.errore) { if (g.nonPagato) await c.annulla(); return errore(g.errore === "riprova" ? "girare" : g.errore, 502); }
+      let indirizzo = g.url;
+      try { indirizzo = await conserva(env, sede, g.url, "vista", 30); } catch {}
+      await env.MEMORIA.put(chiave, indirizzo, { expirationTtl: 30 * GIORNO });
+      return risposta({ url: indirizzo, restano: c.restano }, 200, origine);
     }
 
     // ================= PROVA ADDOSSO =================
     const { avatar, capi } = dati || {};
-    let avatarOk = typeof avatar === "string" && avatar.startsWith(env.BASE_AVATAR);
-    const mio = typeof avatar === "string" && avatar.match(new RegExp(`^${sede.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}/img/([0-9a-f]{24})\\.jpg$`));
-    if (mio) avatarOk = (await env.MEMORIA.getWithMetadata(`file:${mio[1]}`, { type: "stream" })).metadata?.tipo === "avatar";
-    if (!avatarOk) return risposta({ errore: "avatar non ammesso" }, 400, origine);
+    if (!await immagineNostra(env, sede, avatar, ["avatar"])) return risposta({ errore: "avatar non ammesso" }, 400, origine);
     if (!Array.isArray(capi) || !capi.length || capi.length > 4) return risposta({ errore: "servono da 1 a 4 capi" }, 400, origine);
     for (const c of capi) if (!POSTI[c?.posto] || typeof c.url !== "string" || !/^https:\/\/cdn\.shopify\.com\/s\/files\/[^\s"]+$/.test(c.url)) return risposta({ errore: "capo non ammesso" }, 400, origine);
 
@@ -154,9 +276,9 @@ export default {
     if (gia) return risposta({ url: gia, memoria: true }, 200, origine);
 
     const c = await conta(env, req, "prova", +env.LIMITE_PERSONA);
-    if (c.no) return risposta({ errore: "limite", messaggio: c.no }, 429, origine);
+    if (c.no) return errore(c.no, 429);
     const g = await genera(env, env.MODELLO, { prompt: testoProva(capi), image_urls: [avatar, ...capi.map(x => x.url + "?width=1024")] });
-    if (g.errore) { if (g.nonPagato) await c.annulla(); return risposta({ errore: "servizio", messaggio: g.errore === "Non ci sono riuscito. Riprova." ? "Non sono riuscito a vestire l'avatar. Riprova." : g.errore }, 502, origine); }
+    if (g.errore) { if (g.nonPagato) await c.annulla(); return errore(g.errore === "riprova" ? "vestire" : g.errore, 502); }
     let indirizzo = g.url;
     try { indirizzo = await conserva(env, sede, g.url, "prova", 30); } catch {}
     await env.MEMORIA.put(chiave, indirizzo, { expirationTtl: 30 * GIORNO });

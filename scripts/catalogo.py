@@ -183,6 +183,9 @@ UNICA = re.compile(r"^(o/?s|one ?size|one|os|tu|taille unique|taglia unica|unica
 
 # Si legge il negozio come lo vede chi compra dall'Italia: prezzi del mercato italiano (di solito in euro, spesso con
 # dazi già compresi), gli stessi che il browser dell'utente riceve nella scheda del capo.
+# Il cookie da solo non basta: 17 negozi esteri (Nobody's Child, Rixo, Mother…) lo ignorano e davano il prezzo di casa
+# loro convertito (stivali £127 ≈ 146 € contro 242 € sul sito per l'Italia, segnalato da Andrea il 14/11).
+# Il parametro ?country=IT invece lo rispettano tutti: si usa su products.json, cart.js e nella scheda dell'app.
 ITALIA = ["-b", "localization=IT", "-H", "Accept-Language: it-IT,it;q=0.9"]
 
 
@@ -301,23 +304,23 @@ def leggi_negozio(dominio, cache):
     file = cache / f"{dominio}.json.gz"  # compressa: crude sono ~500 MB
     if file.exists() and time.time() - file.stat().st_mtime < 6 * 3600:
         dati = json.loads(gzip.decompress(file.read_bytes()))
-        if dati.get("mercato") == "IT":
+        if dati.get("mercato") == "IT2":
             return dati
     meta = leggi(f"https://{dominio}/meta.json")
     paese = meta.get("country", "")
-    valuta = leggi(f"https://{dominio}/cart.js").get("currency") or meta.get("currency", "EUR")  # valuta del mercato italiano
+    valuta = leggi(f"https://{dominio}/cart.js?country=IT").get("currency") or meta.get("currency", "EUR")  # valuta del mercato italiano
     # dominio finale dopo i redirect (es. rouje.com → www.rouje.com): il browser non segue redirect senza CORS
     finale = subprocess.run(["curl", "-sL", "-o", "/dev/null", "-m", "40", "-A", "Mozilla/5.0", "-w", "%{url_effective}",
                              f"https://{dominio}/products.json?limit=1"], capture_output=True, text=True).stdout
     host = finale.split("/")[2] if finale.startswith("http") else dominio
     prodotti = []
     for pagina in range(1, 9):
-        lotto = leggi(f"https://{dominio}/products.json?limit=250&page={pagina}")["products"]
+        lotto = leggi(f"https://{dominio}/products.json?limit=250&page={pagina}&country=IT")["products"]
         prodotti += lotto
         if len(lotto) < 250:
             break
         time.sleep(0.5)
-    dati = {"valuta": valuta, "paese": paese, "host": host, "prodotti": prodotti, "mercato": "IT"}
+    dati = {"valuta": valuta, "paese": paese, "host": host, "prodotti": prodotti, "mercato": "IT2"}
     file.write_bytes(gzip.compress(json.dumps(dati).encode()))
     return dati
 

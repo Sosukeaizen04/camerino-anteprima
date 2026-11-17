@@ -28,7 +28,7 @@ RX_SCARPE = re.compile(r"\b(shoes?|sneakers?|trainers?|boots?|booties?|bottes?|b
 RX_FUORI = re.compile(r"\b(bag|bags|borsa|sac|bolso|tote|clutch|pouch|belt|ceinture|cintura|earring|necklace|bracelet|ring|jewel|bijou|"
                       r"scarf|sciarpa|foulard|echarpe|hat|cap|beanie|bonnet|sock|socks|chaussette|calz|gift|card|candle|sunglass|lunette|"
                       r"keyring|charm|hair|swim|bikini|maillot|underwear|lingerie|bra\b|brief|culotte|perfume|parfum|towel|mask|glove|gant|"
-                      r"blanket|skullcap|balaclava|\bthrow\b|kids?\b|baby|bebe|enfant|toddler|infant|pj\b|pyjama|pajama|sleep|robe de chambre|gift card|final sale item|laces?|insoles?|shoe care)")
+                      r"blanket|skullcap|balaclava|patron de couture|sewing pattern|\bpdf\b|cartamodell|guantes?|gloves?|mittens?|keychain|key ?ring|headband|head ?scarf|bandana|beret|scrunchie|hair ?clip|bucket hat|llavero|\bthrow\b|kids?\b|baby|bebe|enfant|toddler|infant|pj\b|pyjama|pajama|sleep|robe de chambre|gift card|final sale item|laces?|insoles?|shoe care)")
 
 NUMERI_SCARPE = list(range(35, 48))  # taglie europee 35–47
 
@@ -55,6 +55,7 @@ def genere(p, dominio, misto):
 
 # casi che le regole di catalogo.py sbagliano: prima queste, poi le sue
 PRIMA = [
+    ("top", r"\bvest top|\btank top|\bcami top"),
     ("pantaloni", r"sweat ?pants?|track ?pants?|\bjoggers?\b|\bleggings?\b|\bchándal\b"),
     ("capospalla", r"overshirt|shacket|\bcazadora|\bgabardina|\babrigo|\bchaleco|\bparka"),
     ("maglia", r"\bsudadera|\bjers[eé]is?\b|\bc[aá]rdigan|\bsu[eé]ter|\bstrick|\bpulli"),
@@ -75,6 +76,79 @@ def categoria(p):
         for cat, rx in PRIMA + C.CATEGORIE[1:]:
             if re.search(rx, campo):
                 return cat
+    return None
+
+
+# ---------- materiale, lunghezza, maniche (filtri chiesti da Andrea il 14/11) ----------
+# Si leggono da titolo, tipo, tag e descrizione del negozio. Se il negozio non lo dice, il capo resta senza: niente indovinare.
+MATERIALI = [  # (nome nell'app, parole in en/fr/it/es/de)
+    ("cashmere", r"cashmere|cachemire|kaschmir"),
+    ("lana", r"wool|merino|laine|lana|wolle|alpaca|mohair"),
+    ("seta", r"silk|soie|seta|seide"),
+    ("lino", r"linen|\blin\b|lino|leinen"),
+    ("pelle", r"leather|cuir|pelle|leder|suede|daim|scamosciat|shearling"),
+    ("denim", r"denim"),
+    ("velluto", r"velvet|velours|velluto|corduroy|samt"),
+    ("cotone", r"cotton|coton|cotone|algod[oó]n|baumwolle|poplin|jersey"),
+    ("viscosa", r"viscose|viscosa|rayon|lyocell|tencel|modal|cupro"),
+    ("sintetico", r"polyester|poliestere|polyamide|nylon|acrylic|acrilico|elastane|spandex|recycled poly"),
+]
+RX_PERC = re.compile(r"(\d{1,3})\s*%\s*([a-zà-ü ]{3,30})")
+
+
+def materiale(p):
+    """Il materiale principale: dalla composizione in percentuale se c'è (quello con la quota più alta), altrimenti la prima
+    parola di materiale nel titolo o nei tag."""
+    corpo = re.sub(r"<[^>]+>", " ", p.get("body_html") or "").lower()
+    migliore = None
+    for perc, parola in RX_PERC.findall(corpo):
+        for nome, rx in MATERIALI:
+            if re.search(rx, parola):
+                if not migliore or int(perc) > migliore[0]:
+                    migliore = (int(perc), nome)
+                break
+    if migliore:
+        return migliore[1]
+    t = testo(p)
+    for nome, rx in MATERIALI:
+        if re.search(rx, t):
+            return nome
+    return None
+
+
+def lunghezza(p, cat):
+    """'corta' | 'media' | 'lunga' | None. Detto dal negozio (mini, cropped, midi, maxi…)."""
+    if cat == "scarpe":
+        return None
+    t = f"{p['title']} {p['handle'].replace('-', ' ')}".lower()   # solo il nome: nei tag "short" e "long" sono rumore
+    if cat in ("pantaloni", "jeans") and re.search(r"\bshorts?\b|bermuda|pantaloncin", t):
+        return "corta"
+    if re.search(r"\b(maxi|floor[- ]length|full[- ]length|long (coat|dress|skirt|cardigan)|longline|ankle[- ]length|lungo|lunga|longue)\b", t):
+        return "lunga"
+    if re.search(r"\b(midi|knee[- ]length|mid[- ]length|calf)\b", t):
+        return "media"
+    if re.search(r"\b(mini|cropped|crop|short (dress|skirt|coat|jacket)|corta|corto|courte|shorts?)\b", t):
+        return "corta"
+    return None
+
+
+def maniche(p, cat):
+    """'senza' | 'corte' | '3/4' | 'lunghe' | None, solo per sopra, abiti e giacche."""
+    if cat not in ("maglia", "camicia", "top", "abito", "capospalla"):
+        return None
+    titolo = f"{p['title']} {p['handle'].replace('-', ' ')}".lower()
+    corpo = re.sub(r"<[^>]+>", " ", p.get("body_html") or "").lower()
+    for t in (titolo, corpo):
+        if re.search(r"sleeveless|strapless|halter|\btank\b|\bcami\b|camisole|spaghetti|smanicat|senza maniche|sans manches|d[ée]bardeur|canott|\bvest top", t):
+            return "senza"
+        if re.search(r"3/4|three[- ]quarter|elbow[- ]length|manches? 3/4", t):
+            return "3/4"
+        if re.search(r"short[- ]sleeve|\bs/s\b|manches? courtes|maniche corte|manica corta|cap sleeve|t-?shirt|\btee\b|polo", t):
+            return "corte"
+        if re.search(r"long[- ]sleeve|\bl/s\b|manches? longues|maniche lunghe|manica lunga|long sleeves", t):
+            return "lunghe"
+    if cat in ("maglia", "capospalla"):
+        return "lunghe"     # maglioni, cardigan e giacche: quando le maniche sono corte il negozio lo scrive
     return None
 
 
@@ -177,6 +251,9 @@ def main():
                     "i": img.replace("https://cdn.shopify.com/s/files/", "~"),
                     "s": maschera(prodotte), "d": maschera(disponibili),
                 })
+                for chiave, val in (("f", materiale(p)), ("l", lunghezza(p, cat)), ("w", maniche(p, cat))):
+                    if val:
+                        out[-1][chiave] = val
         if gia:
             nascosti = set(gia["nascosti"])
             out[primo:] = [c for c in out[primo:] if c["h"] not in nascosti]
