@@ -541,11 +541,11 @@ $("schede").onclick = e => {
 // ======================================================================
 // FILTRI — come nell'app di Zalando (Andrea, 18/11): più scelte nello stesso filtro (blu + nero + rosso, cashmere + cotone)
 // e filtri diversi insieme. Dentro un filtro vale "uno qualsiasi", tra filtri diversi "tutti". I dati vengono dal negozio:
-// un capo di cui il negozio non dice il materiale (o la fantasia, lo scollo…) non compare quando si filtra per quello.
+// (fantasia = campo q: "m" nel catalogo vuol dire colore stimato dalla foto) un capo di cui il negozio non dice il materiale (o la fantasia, lo scollo…) non compare quando si filtra per quello.
 // ======================================================================
 const NOMI_FILTRI = {
   f: { cotone: "Cotone", lana: "Lana", cashmere: "Cashmere", seta: "Seta", lino: "Lino", pelle: "Pelle", denim: "Denim", velluto: "Velluto", viscosa: "Viscosa", sintetico: "Sintetico" },
-  m: { righe: "A righe", quadri: "A quadri", fiori: "Floreale", pois: "A pois", animalier: "Animalier", stampa: "Altre stampe" },
+  q: { righe: "A righe", quadri: "A quadri", fiori: "Floreale", pois: "A pois", animalier: "Animalier", stampa: "Altre stampe" },
   a: { aderente: "Aderente", regolare: "Regolare", ampia: "Ampia", oversize: "Oversize" },
   l: { corta: "Corta", normale: "Normale", lunga: "Lunga" },
   w: { senza: "Senza maniche", corte: "Maniche corte", "3/4": "Maniche 3/4", lunghe: "Maniche lunghe" },
@@ -561,7 +561,7 @@ const ORDINI = [["consigliati", "Consigliati"], ["prezzo-su", "Prezzo crescente"
 /** I filtri nell'ordine in cui si vedono; `per` dice in quali posti hanno senso. */
 const GRUPPI = [
   { k: "colore", nome: "Colore" }, { k: "prezzo", nome: "Prezzo" }, { k: "marca", nome: "Marca" },
-  { k: "f", nome: "Materiale", per: p => p !== "scarpe" }, { k: "m", nome: "Fantasia", per: p => p !== "scarpe" },
+  { k: "f", nome: "Materiale", per: p => p !== "scarpe" }, { k: "q", nome: "Fantasia", per: p => p !== "scarpe" },
   { k: "a", nome: "Vestibilità", per: p => p !== "scarpe" }, { k: "l", nome: "Lunghezza", per: p => ["sotto", "abito", "capospalla"].includes(p) },
   { k: "w", nome: "Maniche", per: p => ["sopra", "abito"].includes(p) }, { k: "z", nome: "Scollo", per: p => ["sopra", "abito"].includes(p) },
 ];
@@ -853,7 +853,7 @@ function descrizioneTesto(html) {
 /** Materiale, lunghezza e maniche come li dice il negozio (dal catalogo). */
 function dettagliCapo(c) {
   const voci = [c.f && ["Materiale", NOMI_FILTRI.f[c.f]], c.l && ["Lunghezza", NOMI_FILTRI.l[c.l === "media" ? "normale" : c.l]], c.w && ["Maniche", NOMI_FILTRI.w[c.w]],
-    c.m && ["Fantasia", NOMI_FILTRI.m[c.m]], c.a && ["Vestibilità", NOMI_FILTRI.a[c.a]], c.z && ["Scollo", NOMI_FILTRI.z[c.z]]].filter(Boolean);
+    c.q && ["Fantasia", NOMI_FILTRI.q[c.q]], c.a && ["Vestibilità", NOMI_FILTRI.a[c.a]], c.z && ["Scollo", NOMI_FILTRI.z[c.z]]].filter(Boolean);
   return voci.length ? `<div class="campo"><div class="voci">${voci.map(([a, b]) => `<span><small>${a}</small>${b}</span>`).join("")}</div></div>` : "";
 }
 

@@ -307,7 +307,7 @@ def main():
                 if pieno > prezzo * 1.04:          # in saldo: il negozio mostra il prezzo pieno barrato
                     out[-1]["o"] = round(pieno * cambio)
                 for chiave, val in (("f", materiale(p)), ("l", lunghezza(p, cat)), ("w", maniche(p, cat)),
-                                    ("m", fantasia(p)), ("a", vestibilita(p, cat)), ("z", scollo(p, cat))):
+                                    ("q", fantasia(p)), ("a", vestibilita(p, cat)), ("z", scollo(p, cat))):
                     if val:
                         out[-1][chiave] = val
         if gia:
