@@ -74,7 +74,7 @@ const EN = {
   "Aderente": "Fitted", "Regolare": "Regular", "Ampia": "Loose", "Oversize": "Oversized",
   "Scollo a V": "V-neck", "Girocollo": "Crew neck", "Collo alto": "High neck", "Scollo quadrato": "Square neck", "Spalle scoperte": "Off-shoulder", "All'americana": "Halter",
   "Fino a 50 €": "Up to €50", "Oltre 400 €": "Over €400", "Nessuna scelta con gli altri filtri.": "No options with the other filters.", "Nessun capo": "No items", "Navy": "Navy",
-  "Cortissimi": "Very short", "Medi": "Medium", "Castano scuro": "Dark brown", "Biondo scuro": "Dark blonde", "Platino": "Platinum", "Bianchi": "White",
+  "Rifai": "Redo", "Cortissimi": "Very short", "Medi": "Medium", "Castano scuro": "Dark brown", "Biondo scuro": "Dark blonde", "Platino": "Platinum", "Bianchi": "White",
   "Lisci": "Straight", "Mossi": "Wavy", "Afro": "Afro", "Atletica": "Athletic", "Tipo di capelli": "Hair type", "Altezza": "Height", "Su di te": "About you",
   "Viso": "Face", "Figura intera · se vuoi": "Full body · optional", "Scegli la foto del viso": "Choose a photo of your face", "Scegli i capelli": "Choose your hair", "Crea il mio avatar": "Create my avatar",
   "Una foto del viso, di fronte e con buona luce. Se vuoi, anche una foto in piedi a figura intera: l'avatar ti somiglierà di più.": "A photo of your face, from the front, in good light. If you like, also a full-length photo standing: the avatar will look more like you.",

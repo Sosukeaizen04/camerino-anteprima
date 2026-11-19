@@ -1,6 +1,7 @@
 // Camerino v2 — schermate. Le regole dell'outfit stanno in stylist.js.
 import * as S from "./stylist.js";
 import { LINGUA, cambiaLingua, tr } from "./lingua.js";
+import { isole } from "./isole.js";
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -33,15 +34,31 @@ function ricordaGiri() {
   const k = Object.keys(giri); for (const x of k.slice(0, Math.max(0, k.length - 90))) delete giri[x];
   try { localStorage.setItem(CHIAVE + "-giri", JSON.stringify(giri)); } catch {}
 }
-async function gira(fronte, vista) {
+/**
+ * Chiede un'immagine al server e la controlla prima di mostrarla (19/11: "fare in modo che non succeda più").
+ * Il server la fa già controllare da un modello che vede le immagini; qui si contano i pixel: un pezzo staccato dalla figura
+ * (il ciuffo accanto al viso) → si chiede di rifarla, una volta, senza che l'utente debba fare niente.
+ */
+async function chiediPulita(percorso, corpo) {
+  let d;
+  for (let giro = 0; giro < 2; giro++) {
+    const r = await fetch(SERVER + percorso, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ lingua: LINGUA, ...corpo, ...(giro ? { rifai: true } : {}) }) });
+    d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.url) return { errore: d.messaggio };
+    await new Promise((ok, ko) => { const im = new Image(); im.onload = ok; im.onerror = ko; im.src = d.url; });
+    const c = await isole(d.url);
+    if (c.ok) return d;
+    console.log("pezzi staccati", c.isole, "→ la rifaccio");
+  }
+  return d;
+}
+async function gira(fronte, vista, rifai = false) {
   const k = fronte + "|" + vista;
-  if (giri[k] || girando) return;
+  if ((giri[k] && !rifai) || girando) return;
   girando = k; disegnaPalco();
   try {
-    const r = await fetch(SERVER + "/gira", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ immagine: fronte, vista, lingua: LINGUA }) });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.url) throw new Error(d.messaggio || "Non sono riuscito a girare l'avatar. Riprova.");
-    await new Promise((ok, ko) => { const im = new Image(); im.onload = ok; im.onerror = ko; im.src = d.url; });
+    const d = await chiediPulita("/gira", { immagine: fronte, vista, ...(rifai ? { rifai: true } : {}) });
+    if (d.errore !== undefined || !d.url) throw new Error(d.errore || "Non sono riuscito a girare l'avatar. Riprova.");
     giri[k] = d.url; ricordaGiri();
     if (d.restano != null && d.restano <= 3) toast(d.restano ? `Oggi ti restano ${d.restano} immagini` : "Era l'ultima immagine di oggi");
   } catch (e) { toast(e.message || "Non sono riuscito a girare l'avatar. Riprova."); if (girando === k) vistaGiro = 0; }
@@ -52,16 +69,15 @@ function ricordaProve() {
   const k = Object.keys(prove); for (const x of k.slice(0, Math.max(0, k.length - 60))) delete prove[x];    // le ultime 60 bastano
   try { localStorage.setItem(CHIAVE + "-prove", JSON.stringify(prove)); } catch {}
 }
-async function provaLook() {
+async function provaLook(rifai = false) {
   if (!SERVER || inCorso || S.mancanti(outfit).length) return;
   const k = chiaveLook();
   inCorso = k; disegnaPalco();
   try {
-    const r = await fetch(SERVER + "/prova", { method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ lingua: LINGUA, avatar: avatarPerServer(), capi: S.capiDi(outfit).map(c => ({ posto: S.postoDi(c), url: "https://cdn.shopify.com/s/files/" + c.i.slice(1) })) }) });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.url) throw new Error(d.messaggio || "Non sono riuscito a vestire l'avatar. Riprova.");
-    await new Promise((ok, ko) => { const im = new Image(); im.onload = ok; im.onerror = ko; im.src = d.url; });    // pronta prima di mostrarla
+    const d = await chiediPulita("/prova", { avatar: avatarPerServer(), capi: S.capiDi(outfit).map(c => ({ posto: S.postoDi(c), url: "https://cdn.shopify.com/s/files/" + c.i.slice(1) })), ...(rifai ? { rifai: true } : {}) });
+    if (d.errore !== undefined || !d.url) throw new Error(d.errore || "Non sono riuscito a vestire l'avatar. Riprova.");
+    // il look rifatto: le viste girate del vecchio non valgono più
+    if (rifai && prove[k]) for (const x of Object.keys(giri)) if (x.startsWith(prove[k] + "|")) delete giri[x];
     prove[k] = d.url; ricordaProve();
     if (chiaveLook() === k) { vestito = true; vistaAvatar = 0; vistaGiro = 0; }
     if (d.restano != null && d.restano <= 3) toast(d.restano ? `Oggi ti restano ${d.restano} prove` : "Era l'ultima prova di oggi");
@@ -388,7 +404,7 @@ function disegnaPalco(messaggio) {
   const giaSalvato = salvati.some(s => s.capi.join() === S.capiDi(outfit).map(S.chiave).join());
   const nomeVista = base ? null : NOME_GIRO[GIRI[vistaGiro]];
   const frecce = base ? (vv.length > 1 ? `<div class="giro"><button class="icona" id="gira-sx" aria-label="Gira a sinistra">‹</button><span class="punti-giro">${vv.map((_, i) => `<i class="${i === vistaAvatar % vv.length ? "ora" : ""}"></i>`).join("")}</span><button class="icona" id="gira-dx" aria-label="Gira a destra">›</button></div>` : "")
-    : SERVER ? `<div class="giro"><button class="icona" id="gira-sx" aria-label="Gira a sinistra" ${girando ? "disabled" : ""}>‹</button><span class="nome-vista">${nomeVista}</span><button class="icona" id="gira-dx" aria-label="Gira a destra" ${girando ? "disabled" : ""}>›</button></div>` : "";
+    : SERVER ? `<div class="giro"><button class="icona" id="gira-sx" aria-label="Gira a sinistra" ${girando ? "disabled" : ""}>‹</button><span class="nome-vista">${nomeVista}</span><button class="icona" id="gira-dx" aria-label="Gira a destra" ${girando ? "disabled" : ""}>›</button>${(vistaGiro && giri[fronte + "|" + GIRI[vistaGiro]]) || (!vistaGiro && conLook) ? `<button class="piccolo rifai" id="rifai" ${girando || inCorso ? "disabled" : ""}>Rifai</button>` : ""}</div>` : "";
   $("palco").innerHTML = `<div class="tela"><img class="avatar${specchio ? " specchio" : ""}${attesa ? " attesa" : ""}" src="${esc(src)}" alt="${conLook ? "L'avatar con il look" : "Avatar"}" draggable="false"></div>
     ${pillola}
     <div class="colonna">${caselle}</div>
@@ -494,6 +510,7 @@ $("palco").addEventListener("click", e => {
   else if (b.id === "gira-sx") frecciaGiro(-1);
   else if (b.id === "gira-dx") frecciaGiro(1);
   else if (b.id === "zoom") apriZoom();
+  else if (b.id === "rifai") { if (vistaGiro) gira(palcoOra.fronte, GIRI[vistaGiro], true); else provaLook(true); }
 });
 $("altro").onclick = () => componi(true);
 
@@ -999,10 +1016,8 @@ function usaAvatar(a) {
   vistaAvatar = 0; vistaGiro = 0; vestito = true; ricorda(); if (!$("s-camerino").hidden) disegna();
 }
 async function chiediAvatar(corpo) {
-  const r = await fetch(SERVER + "/avatar", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ lingua: LINGUA, genere: profilo.genere, ...corpo }) });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok || !d.url) throw new Error(d.messaggio || "Non ci sono riuscito. Riprova.");
-  await new Promise((ok, ko) => { const im = new Image(); im.onload = ok; im.onerror = ko; im.src = d.url; });
+  const d = await chiediPulita("/avatar", { genere: profilo.genere, ...corpo });
+  if (d.errore !== undefined || !d.url) throw new Error(d.errore || "Non ci sono riuscito. Riprova.");
   return d.url;
 }
 /** Foto ridotta a 1024 px in JPEG: meno da inviare, stessa resa. */
