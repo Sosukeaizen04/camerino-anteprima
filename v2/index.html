@@ -82,9 +82,11 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 .budget .barra i { display: block; height: 100%; background: var(--ink); max-width: 100%; transition: width .25s; }
 .budget.sfora .barra i { background: var(--rosso); }
 .budget.sfora .resto { color: var(--rosso); }
-.palco { flex: 1; min-height: 0; position: relative; overflow: hidden; background: var(--carta); touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab; }
+.palco { flex: 1; min-height: 0; position: relative; overflow: hidden; background: var(--carta); touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
 .palco.gira { cursor: grabbing; }
-.palco .avatar { position: absolute; inset: 0 0 40px 0; width: 100%; height: calc(100% - 40px); object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
+.palco .tela { position: absolute; inset: 0 0 40px 0; will-change: transform; }
+.palco .avatar { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
+.palco.zoomato .colonna, .palco.zoomato .attrezzi, .palco.zoomato .pillola { opacity: .25; pointer-events: none; transition: opacity .2s; }
 .palco .avatar.specchio { transform: scaleX(-1); }
 .punti { position: absolute; left: 0; right: 0; bottom: 4px; display: flex; gap: 5px; justify-content: center; }
 .punti i { width: 5px; height: 5px; border-radius: 50%; background: var(--riga); }
@@ -154,7 +156,8 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 .cerca input { flex: 1; min-width: 0; border: 0; padding: 0 12px; height: 46px; background: none; font-size: 16px; }
 .cerca input:focus { outline: none; }
 .cerca button { width: 50px; border-left: 1px solid var(--ink); display: grid; place-items: center; }
-.foto { position: relative; aspect-ratio: 3 / 4; max-height: 50vh; width: 100%; background: var(--velo); border: 1px solid var(--riga); }
+.foto { position: relative; aspect-ratio: 3 / 4; max-height: 50vh; width: 100%; background: var(--velo); border: 1px solid var(--riga); overflow: hidden; touch-action: pan-y; }
+.foto.zoomato { touch-action: none; }
 .foto img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .dettagli { display: grid; gap: 4px; padding: 12px 0; }
 .dettagli .marca { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
@@ -191,20 +194,56 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 .giro .nome-vista { font-size: 11px; color: var(--ink-2); min-width: 76px; text-align: center; }
 .punti-giro { display: flex; gap: 5px; } .punti-giro i { width: 5px; height: 5px; border-radius: 50%; background: var(--riga); } .punti-giro i.ora { background: var(--ink); }
 .zoom-vista { position: fixed; inset: 0; z-index: 50; background: var(--carta); overflow: hidden; touch-action: none; }
-.zoom-vista img { width: 100%; height: 100%; object-fit: contain; transition: transform .2s; cursor: zoom-in; -webkit-user-drag: none; user-select: none; }
+.zoom-vista .tela { position: absolute; inset: 0; will-change: transform; }
+.zoom-vista img { width: 100%; height: 100%; object-fit: contain; -webkit-user-drag: none; user-select: none; pointer-events: none; }
 .zoom-vista img.specchio { transform: scaleX(-1); }
-.zoom-vista.dentro img { transform: scale(2.6); cursor: move; transition: transform-origin 0s, transform .2s; }
-.zoom-vista.dentro img.specchio { transform: scaleX(-1) scale(2.6); }
 .zoom-vista button { position: absolute; top: max(12px, env(safe-area-inset-top, 0px)); right: 12px; background: var(--carta); }
 .zoom-vista small { position: absolute; bottom: max(14px, env(safe-area-inset-bottom, 0px)); left: 0; right: 0; text-align: center; color: var(--ink-3); font-size: 12px; }
-.filtri-capo, #c-filtri { flex-wrap: wrap; }
-.pannello-filtri { flex-basis: 100%; display: grid; gap: 10px; padding: 10px 0 4px; border-top: 1px solid var(--riga); margin-top: 4px; }
-.pannello-filtri .scelte button { padding: 6px 9px; font-size: 12px; min-height: 0; }
+.filtri-capo, #c-filtri { flex-wrap: wrap; overflow: visible; }
+/* --- 19/11: filtri come Zalando (scelta multipla, pannello con conteggi), zoom con due dita --- */
+.riga-filtri { flex-basis: 100%; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.riga-filtri::-webkit-scrollbar { display: none; }
+.riga-filtri .piccolo { flex: none; }
+.pannello-filtri { position: absolute; inset: 0; z-index: 40; background: var(--carta); display: flex; flex-direction: column; transform: translateY(100%); transition: transform .25s ease; }
+.pannello-filtri.aperto { transform: none; }
+.pannello-filtri .foglio-corpo { padding-bottom: 12px; }
+.gruppo-filtri { border-bottom: 1px solid var(--riga); }
+.testa-gruppo { width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 15px 0; text-align: left; font-size: 15px; }
+.testa-gruppo small { color: var(--ink-3); font-size: 12px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.testa-gruppo i { font-style: normal; font-size: 18px; width: 18px; text-align: center; }
+.opzioni { display: grid; padding-bottom: 10px; }
+.voce { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 10px; min-height: 44px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--velo); }
+.voce small, .voce-colore small { color: var(--ink-3); font-size: 12px; }
+.spunta { width: 20px; height: 20px; border: 1.5px solid var(--ink-3); display: grid; place-items: center; }
+.voce[aria-pressed="true"] .spunta { background: var(--ink); border-color: var(--ink); }
+.voce[aria-pressed="true"] .spunta::after { content: ""; width: 10px; height: 5px; border: solid var(--carta); border-width: 0 0 2px 2px; transform: translateY(-1px) rotate(-45deg); }
+.voce.tondo .spunta { border-radius: 50%; }
+.voce.tondo[aria-pressed="true"] .spunta::after { width: 8px; height: 8px; border: 0; border-radius: 50%; background: var(--carta); transform: none; }
+.opzioni-colore { grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 12px 6px; padding-top: 4px; }
+.voce-colore { display: grid; justify-items: center; gap: 4px; font-size: 12px; padding: 4px 0; }
+.voce-colore i { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--riga); }
+.voce-colore[aria-pressed="true"] i { outline: 2px solid var(--ink); outline-offset: 2px; }
+.niente-filtro { color: var(--ink-3); font-size: 13px; margin: 6px 0 12px; }
+.interruttore { width: 38px !important; height: 22px; border-radius: 11px; background: var(--riga); position: relative; }
+.interruttore::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--carta); transition: left .15s; }
+.interruttore.su { background: var(--ink); }
+.interruttore.su::after { left: 19px; }
+.piede-filtri { flex: none; display: flex; gap: 8px; padding-block: 10px max(12px, env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--riga); }
+.piede-filtri .vuoto { flex: 1; }
+.piede-filtri .pieno { flex: 2; }
+.foto-due { display: grid; grid-template-columns: repeat(2, 128px); gap: 10px; }
+#av-da-foto { width: 100%; }
+.foto-scelta { display: grid; place-items: center; gap: 6px; aspect-ratio: 3 / 4; border: 1px dashed var(--ink-3); cursor: pointer; position: relative; overflow: hidden; }
+.foto-scelta span { font-size: 28px; color: var(--ink-3); }
+.foto-scelta small { position: absolute; bottom: 0; left: 0; right: 0; padding: 6px; font-size: 11px; text-align: center; background: color-mix(in srgb, var(--carta) 85%, transparent); }
+.foto-scelta.piena { border-style: solid; border-color: var(--ink); }
+.foto-scelta img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.appena { display: grid; grid-template-columns: 110px 1fr; gap: 12px; align-items: start; padding: 4px 0 14px; margin-bottom: 12px; border-bottom: 1px solid var(--riga); font-size: 14px; }
+.appena img { width: 110px; aspect-ratio: 3 / 4; object-fit: cover; border: 1px solid var(--riga); }
+.appena .scelte button { height: 34px; font-size: 12px; padding: 0 8px; }
+.carta .saldo { color: #b3202a; }
+.carta s { color: var(--ink-3); }
 .chiedi > span:nth-child(2) { white-space: nowrap; }
-.gruppo-filtro small { display: block; font-size: 11px; color: var(--ink-3); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .08em; }
-.colori-filtro button { width: 30px; height: 30px; padding: 3px; min-width: 0; }
-.colori-filtro button i { display: block; width: 100%; height: 100%; border: 1px solid var(--riga); }
-.colori-filtro button[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 1px; }
 .colori-capo { display: flex; flex-wrap: wrap; gap: 6px; }
 .colori-capo > * { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 5px 8px; border: 1px solid var(--riga); background: var(--carta); color: var(--ink); font-family: inherit; }
 .colori-capo i { width: 12px; height: 12px; border: 1px solid var(--riga); display: inline-block; }
@@ -290,7 +329,8 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
     <div class="foglio-corpo lati" id="foglio2-corpo"></div>
   </div>
 
-  <div class="zoom-vista" id="zoom-vista" hidden><img alt="Avatar ingrandito" draggable="false"><button class="icona" aria-label="Chiudi">✕</button><small>Tocca per ingrandire · trascina per muoverti</small></div>
+  <div class="pannello-filtri" id="pannello-filtri" hidden role="dialog" aria-modal="true"></div>
+  <div class="zoom-vista" id="zoom-vista" hidden><div class="tela"><img alt="Avatar ingrandito" draggable="false"></div><button class="icona" aria-label="Chiudi">✕</button><small>Pizzica con due dita per ingrandire · trascina per muoverti</small></div>
 
   <div class="toast" id="toast" role="status"></div>
 </div>

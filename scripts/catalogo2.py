@@ -152,6 +152,58 @@ def maniche(p, cat):
     return None
 
 
+def _nome(p):
+    """Titolo e handle, più i soli tag strutturati (neckline:…, fit:…, print-group:…): dove il negozio dice fantasia,
+    vestibilità e scollo. Gli altri tag sono rumore (collezioni, "print:Solid", "fit-liberty"), la descrizione parla d'altro."""
+    tag = p.get("tags") or []
+    tag = tag if isinstance(tag, list) else str(tag).split(",")
+    buoni = [t for t in tag if re.match(r"\s*((neckline|fit[ _]?type|fit|print[-_ ]group|pattern)\s*:|fitfilter-)", t, re.I) and not re.search(r"solid|s[óo]lido", t, re.I)]
+    return f"{p['title']} {p['handle'].replace('-', ' ')} {' '.join(buoni)}".lower()
+
+
+FANTASIE = [
+    ("righe", r"strip(e|ed|es)\b|pinstripe|breton|mariniere|marinière|ray[ée]|rayure|a righe|rigat|gestreift|\braya"),
+    ("quadri", r"\bcheck(ed|s)?\b|plaid|tartan|gingham|houndstooth|pied[- ]de[- ]poule|carreaux|\bquadri|vichy|cuadros|kariert|\bmadras"),
+    ("fiori", r"floral|flower|fleur|fleuri|\bfiori|florea|\bflores\b|blumen|\bliberty\b|botanical"),
+    ("pois", r"polka|\bdots?\b|dotted|\bpois\b|lunares|tupfen"),
+    ("animalier", r"leopard|léopard|zebra|snake|python|cheetah|tiger|animal[- ]?print|animalier|\bleo\b|croc[- ]print|giraffe"),
+    ("stampa", r"\bprint(ed)?\b|imprim[ée]|paisley|tie[- ]dye|camo(uflage)?\b|\bstampa|estampad|graphic|jacquard|motif"),
+]
+VESTIBILITA = [
+    ("oversize", r"oversi[sz]ed?|boyfriend|\bbaggy\b"),
+    ("ampia", r"wide[- ]leg|\bwide\b|palazzo|\bloose\b|relaxed|\bflare[ds]?\b|balloon|barrel|culotte"),
+    ("aderente", r"\bslim\b|skinny|fitted|bodycon|\bajust[ée]|moulant|aderent|second skin|\bcigarette"),
+    ("regolare", r"regular fit|\bstraight\b|\bdroit\b|\bdritt|classic fit"),
+]
+SCOLLI = [
+    ("v", r"v[- ]?neck|\bcol v\b|scollo a v|v[- ]neckline|\bwrap\b|cache[- ]coeur|portafoglio"),
+    ("alto", r"turtle ?neck|roll[- ]?neck|mock[- ]?neck|high[- ]neck|funnel|col roul[ée]|dolcevita|collo alto|rollkragen|cuello alto"),
+    ("spalle", r"off[- ]the[- ]shoulder|off[- ]shoulder|one[- ]shoulder|bardot|asymmetric neck|[ée]paules? d[ée]nud|monospalla"),
+    ("quadrato", r"square[- ]neck|col carr[ée]|scollo quadrato"),
+    ("americana", r"halter|all'americana|dos nu|neckholder"),
+    ("giro", r"crew ?neck|round[- ]neck|\bcol rond\b|girocollo"),
+]
+
+
+def fantasia(p):
+    t = _nome(p)
+    return next((nome for nome, rx in FANTASIE if re.search(rx, t)), None)
+
+
+def vestibilita(p, cat):
+    if cat in ("scarpe",):
+        return None
+    t = _nome(p)
+    return next((nome for nome, rx in VESTIBILITA if re.search(rx, t)), None)
+
+
+def scollo(p, cat):
+    if cat not in ("maglia", "camicia", "top", "abito"):
+        return None
+    t = _nome(p)
+    return next((nome for nome, rx in SCOLLI if re.search(rx, t)), None)
+
+
 def numero_scarpa(etichetta, sistema, gen):
     """Taglia europea (35–47) di una variante di scarpa, o None. Le conversioni da US/UK sono indicative."""
     e = etichetta.upper().replace(",", ".")
@@ -251,7 +303,11 @@ def main():
                     "i": img.replace("https://cdn.shopify.com/s/files/", "~"),
                     "s": maschera(prodotte), "d": maschera(disponibili),
                 })
-                for chiave, val in (("f", materiale(p)), ("l", lunghezza(p, cat)), ("w", maniche(p, cat))):
+                pieno = max((float(v.get("compare_at_price") or 0) for v in varianti), default=0)
+                if pieno > prezzo * 1.04:          # in saldo: il negozio mostra il prezzo pieno barrato
+                    out[-1]["o"] = round(pieno * cambio)
+                for chiave, val in (("f", materiale(p)), ("l", lunghezza(p, cat)), ("w", maniche(p, cat)),
+                                    ("m", fantasia(p)), ("a", vestibilita(p, cat)), ("z", scollo(p, cat))):
                     if val:
                         out[-1][chiave] = val
         if gia:

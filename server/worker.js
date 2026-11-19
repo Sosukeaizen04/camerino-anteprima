@@ -6,6 +6,8 @@
 //   POST /prova   { avatar, capi: [{posto, url}] }                       → { url }   l'avatar con il look addosso
 //   POST /avatar  { modo: "foto", genere, foto: "data:image/jpeg;base64,…" } → { url }   avatar dalla foto della persona
 //   POST /avatar  { modo: "personaggio", genere, scelte: {…} }            → { url }   personaggio inventato
+//   POST /avatar  { modo: "foto", …, foto2?, su?: {capelli, tinta, ricci, corpo, altezza, taglia} }  → foto del viso + figura intera + "su di te" (come Alta)
+//   POST /avatar  { modo: "ritocco", genere, immagine, ritocco: "capelli-corti"|… }  → { url }   corregge un avatar già creato
 //   POST /gira    { immagine, vista: "destra"|"sinistra"|"dietro" }        → { url }   la stessa figura vista da un lato o da dietro
 //   POST /chiedi  { testo, genere, budget, lingua, storia? }               → { risposta, richiesta }   lo stylist: capisce cosa si cerca
 //   GET  /img/<id>.jpg                                                     immagini conservate
@@ -43,8 +45,37 @@ function testoPersonaggio(genere, s) {
   const capelli = s.tipo === "animale" || s.tipo === "robot" || s.capelli === "nessuno" ? "" : `, ${s.capelli === "rasati" ? SCELTE.capelli.rasati : `${SCELTE.tinta[s.tinta]} ${SCELTE.capelli[s.capelli]}`}`;
   return `A single character: ${figura}${capelli}, ${SCELTE.corpo[s.corpo]} body, adult proportions, ${BASE}, ${POSA}. Style: ${SCELTE.stile[s.stile]}. One character only, no text, no props.`;
 }
-const testoFoto = () => `Image 1 is a photo of a real person. Create a clean full-body photo of this same person: keep the face, facial features, hair, skin tone, body shape and proportions identical. ` +
-  `The person is ${BASE}, ${POSA}. Realistic fashion catalogue photo, one person only, no text.`;
+// --- avatar dalla foto: come Alta (Andrea, 18/11), la foto dice il viso, "su di te" dice ciò che la foto può nascondere
+// (capelli raccolti o in controluce, corpo coperto o tagliato). Ciò che la persona dichiara vince sulla foto.
+const SU_DI_TE = {
+  capelli: { cortissimi: "very short cropped hair (buzz cut or pixie), well above the ears", corti: "short hair, ending between the ears and the jaw",
+    medi: "medium-length hair, ending between the chin and the shoulders", lunghi: "long hair, falling below the shoulders", rasati: "a shaved head", raccolti: "hair tied back in a bun or ponytail" },
+  tinta: { nero: "black", castano_scuro: "dark brown", castano: "brown", biondo_scuro: "dark blonde", biondo: "blonde", platino: "platinum blonde",
+    rosso: "red", grigio: "grey or silver", bianco: "white" },
+  ricci: { lisci: "straight", mossi: "wavy", ricci: "curly", afro: "afro-textured, coily" },
+  corpo: { esile: "slim, slender build", media: "average build", atletica: "athletic, toned build", robusta: "broad, sturdy build", morbida: "curvy, full-figured build" },
+};
+const TAGLIE_OK = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL"];
+function testoFoto(n, d = {}) {
+  const foto = n > 1 ? "Images 1 and 2 are photos of the same real person (one may be a close-up of the face, one a full-body photo)." : "Image 1 is a photo of a real person.";
+  const capelli = SU_DI_TE.capelli[d.capelli]
+    ? `Hair: exactly ${[SU_DI_TE.ricci[d.ricci], SU_DI_TE.tinta[d.tinta]].filter(Boolean).join(", ")} ${SU_DI_TE.capelli[d.capelli]}. This is how the person wears their hair: follow it even if the photo shows the hair differently or partly hidden.`
+    : "Hair: the exact same haircut as in the photo — same length, cut, volume, parting, texture and colour. Never make the hair longer, fuller or different.";
+  const corpo = [d.altezza ? `${d.altezza} cm tall` : "", SU_DI_TE.corpo[d.corpo] || "", d.taglia ? `wears clothing size ${d.taglia} (EU women/men sizing)` : ""].filter(Boolean).join(", ");
+  return `${foto} Create a clean, realistic full-body photo of THIS same person, so that they recognise themselves. ` +
+    `Identity: keep the face, facial features, eyebrows, eyes, nose, mouth, jaw, skin tone, freckles or marks, age and expression identical. ${capelli} ` +
+    (corpo ? `Body: ${corpo}; realistic proportions for these measurements, not idealised. ` : "Body: the same body shape and proportions as in the photo, not idealised. ") +
+    `The person is ${BASE}, ${POSA}. No glasses, hats or jewellery unless they are part of the face in the photo. Realistic fashion catalogue photo, one person only, no text.`;
+}
+// --- ritocco di un avatar già creato: si cambia una cosa sola, il resto identico
+const RITOCCHI = {
+  "capelli-corti": "Make the hair clearly shorter (shorten the existing haircut by a lot), same colour and texture.",
+  "capelli-lunghi": "Make the hair clearly longer, same colour and texture.",
+  "piu-snella": "Make the body a little slimmer, realistic.", "piu-robusta": "Make the body a little fuller and broader, realistic.",
+  "piu-alta": "Make the person look a little taller with longer legs.", "piu-bassa": "Make the person look a little shorter.",
+};
+const testoRitocco = k => `Image 1 is a full-body photo of a person. ${RITOCCHI[k]} Keep everything else identical: face, identity, skin, clothes, pose, ` +
+  `framing, the plain white background and the light. One person only, no text.`;
 function testoProva(capi) {
   const elenco = capi.map((c, i) => `image ${i + 2}: ${POSTI[c.posto]}`).join("; ");
   return `Image 1 is a figure standing on a plain white background. Dress this exact figure in the garments shown in the other images (${elenco}). ` +
@@ -121,7 +152,10 @@ const VISTE = {
 };
 const testoGira = vista => `Image 1 shows a figure standing on a plain white background. Show this exact same figure ${VISTE[vista]}. ` +
   `Keep everything identical: the same person or character, body shape, height, hair, skin, the same clothes and shoes with the same colours, fabrics, ` +
-  `patterns, lengths and fit, the same drawing style. Full body from head to toe visible, arms relaxed, same plain white background, same soft light. Add nothing.`;
+  `patterns, lengths and fit, the same drawing style. Full body from head to toe visible, arms relaxed, same plain white background, same soft light. Add nothing. ` +
+  `Redraw the whole figure from the new angle: the hair must fall naturally for this view and belong to the head. Leave nothing from the original front view: ` +
+  `no loose strands, wisps or pieces of hair floating beside the face or the body, no ghost outlines, no doubled edges, no leftover fragments. The white background around the figure is perfectly clean.`;
+const VERSIONE_GIRA = 2;   // 19/11: istruzione nuova contro i ciuffi rimasti dalla vista di fronte (amico di Andrea) → le viste vecchie si rifanno
 
 // --- lo stylist: dal testo libero a una richiesta che l'app sa comporre col catalogo vero (l'AI non inventa capi)
 const STILI = ["Minimal", "Parigino", "Lusso", "Romantico", "Boho", "Colore", "Italiano", "Maglieria", "Sostenibile", "Denim", "Curvy", "Sportivo", "Streetwear", "Sera", "Rock"];
@@ -227,8 +261,19 @@ export default {
       if (!["d", "u"].includes(genere)) return risposta({ errore: "genere non valido" }, 400, origine);
       let corpo, modello;
       if (modo === "foto") {
-        if (typeof foto !== "string" || !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(foto) || foto.length > 3_000_000) return risposta({ errore: "foto non valida" }, 400, origine);
-        corpo = { prompt: testoFoto(), image_urls: [foto] }; modello = env.MODELLO;
+        const foto2 = dati.foto2, buona = f => typeof f === "string" && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(f) && f.length <= 3_000_000;
+        if (!buona(foto) || (foto2 != null && !buona(foto2))) return risposta({ errore: "foto non valida" }, 400, origine);
+        // "su di te": solo valori conosciuti
+        const d = dati.su || {}, su = {};
+        for (const k of ["capelli", "tinta", "ricci", "corpo"]) if (SU_DI_TE[k][d[k]]) su[k] = d[k];
+        if (Number.isInteger(+d.altezza) && +d.altezza >= 130 && +d.altezza <= 215) su.altezza = +d.altezza;
+        if (TAGLIE_OK.includes(d.taglia)) su.taglia = d.taglia;
+        const foto_ = foto2 ? [foto, foto2] : [foto];
+        corpo = { prompt: testoFoto(foto_.length, su), image_urls: foto_ }; modello = env.MODELLO;
+      } else if (modo === "ritocco") {
+        if (!RITOCCHI[dati.ritocco]) return risposta({ errore: "ritocco non valido" }, 400, origine);
+        if (!await immagineNostra(env, sede, dati.immagine, ["avatar"])) return risposta({ errore: "immagine non ammessa" }, 400, origine);
+        corpo = { prompt: testoRitocco(dati.ritocco), image_urls: [dati.immagine] }; modello = env.MODELLO;
       } else if (modo === "personaggio") {
         const s = scelte || {};
         for (const k of ["tipo", "corpo", "colore", "stile"]) if (!SCELTE[k][s[k]]) return risposta({ errore: `scelta non valida: ${k}` }, 400, origine);
@@ -252,7 +297,7 @@ export default {
       const { immagine, vista } = dati || {};
       if (!VISTE[vista]) return risposta({ errore: "vista non valida" }, 400, origine);
       if (!await immagineNostra(env, sede, immagine, ["avatar", "prova"])) return risposta({ errore: "immagine non ammessa" }, 400, origine);
-      const chiave = "gira:" + await impronta(JSON.stringify([env.MODELLO, VERSIONE, immagine, vista]));
+      const chiave = "gira:" + await impronta(JSON.stringify([env.MODELLO, VERSIONE, VERSIONE_GIRA, immagine, vista]));
       const gia = await env.MEMORIA.get(chiave);
       if (gia) return risposta({ url: gia, memoria: true }, 200, origine);
       const c = await conta(env, req, "prova", +env.LIMITE_PERSONA);
