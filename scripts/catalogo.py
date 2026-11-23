@@ -68,8 +68,8 @@ NEGOZI = [
     ("rains.com", "Rains", "FR", "Streetwear", True),
     ("eu.motelrocks.com", "Motel Rocks", "UK", "Streetwear", False),
     # sera e festa
-    ("eu.ohpolly.com", "Oh Polly", "UK", "Sera", False), ("lnaclothing.com", "LNA", "US", "Sera", False),
-    ("edikted.com", "Edikted", "US", "Sera", False),
+    ("eu.ohpolly.com", "Oh Polly", "UK", "Sera", False), ("lnaclothing.com", "LNA", "US", "Minimal", False),
+    ("edikted.com", "Edikted", "US", "Streetwear", False),
     # rock
     ("eu.killstar.com", "Killstar", "UK", "Rock", True), ("dollskill.com", "Dolls Kill", "US", "Rock", False),
     # camicie

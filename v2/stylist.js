@@ -81,7 +81,7 @@ export function tipoColore(capo) {
 }
 
 // ---------- stile ----------
-const AFFINI = {
+export const AFFINI = {
   Minimal: ["Parigino", "Lusso", "Denim", "Maglieria", "Italiano", "Sostenibile"],
   Parigino: ["Minimal", "Romantico", "Denim", "Maglieria", "Italiano", "Lusso"],
   Lusso: ["Minimal", "Parigino", "Italiano", "Maglieria", "Sera"],
@@ -99,22 +99,50 @@ const AFFINI = {
   Rock: ["Streetwear", "Denim", "Sera"],
 };
 export const STILI = Object.keys(AFFINI);
+/** Quanto è elegante un capo: 0 sportivo, 1 casual, 2 curato, 3 elegante (dal catalogo; senza dato vale "curato"). */
+export const registro = c => c.r ?? 2;
+// stili che non vogliono capi sportivi, e quelli che chiedono almeno "curato" (Andrea 20/11: lusso italiano ≠ hip hop)
+const SENZA_SPORT = new Set(["Lusso", "Italiano", "Sera", "Parigino", "Minimal", "Maglieria", "Romantico", "Curvy"]);
+const CURATI = new Set(["Lusso", "Italiano", "Sera"]);
+// negozi di scarpe che non stanno con stili curati se non li si sceglie
+const SCARPE_DI_STRADA = new Set(["Rock", "Streetwear", "Sportivo"]);
+/** Il capo è ammesso dagli stili scelti? `stretto` = solo gli stili scelti, altrimenti anche gli affini. */
+/** Il livello di eleganza va bene per gli stili scelti? (vale anche quando si allarga ad altri negozi) */
+export function eleganzaOk(capo, stili) {
+  if (!stili?.length) return true;
+  const r = registro(capo);
+  if (stili.every(s => SENZA_SPORT.has(s)) && r === 0) return false;
+  return !(stili.every(s => CURATI.has(s)) && r < 2);
+}
+export function nelloStile(capo, stili, negozi, stretto) {
+  if (!stili?.length) return true;
+  const st = negozi[capo.n].stile;
+  if (!eleganzaOk(capo, stili)) return false;
+  // le scarpe le fanno pochi negozi: conta che non siano di un negozio "di strada" se lo stile non lo è
+  if (postoDi(capo) === "scarpe") return stili.includes(st) || !SCARPE_DI_STRADA.has(st) || stili.some(s => SCARPE_DI_STRADA.has(s));
+  return stili.includes(st) || (!stretto && stili.some(s => AFFINI[s].includes(st)));
+}
 // senza stili scelti si parte da quelli più portabili, non da quelli di nicchia (sera, rock…)
 const COMUNI = ["Minimal", "Parigino", "Denim", "Colore", "Italiano", "Maglieria", "Sostenibile", "Romantico"];
 const affinita = (a, b) => a === b ? 2 : AFFINI[a]?.includes(b) ? 1 : -2;
 
 // ---------- stagione ----------
-const DA_CALDO = /sandal|slide|adilette|slipper|pantofol|ciabatt|claquette|\bmules?\b|slingback|open.?toe|strappy|feather|espadrill|flip.?flop|tong\b|shorts?\b|bermuda|\blinen|\blin\b|\blino\b|crochet|raffia|sleeveless|sans manches|d[ée]bardeur|canott|\btank\b|\bcami\b|bandeau|bikini|mini ?short/i;
+const DA_CALDO = /halter|strapless|backless|bandeau|sandal|slide|adilette|slipper|pantofol|ciabatt|claquette|\bmules?\b|slingback|open.?toe|strappy|feather|espadrill|flip.?flop|tong\b|shorts?\b|bermuda|\blinen|\blin\b|\blino\b|crochet|raffia|sleeveless|sans manches|d[ée]bardeur|canott|\btank\b|\bcami\b|bandeau|bikini|mini ?short/i;
 const DA_FREDDO = /\bboots?\b|bottes?|bottines?|stival|\bwool|laine|\blana\b|cashmere|cachemire|puffer|piumin|doudoune|shearling|fleece|polaire|velvet|velours|turtleneck|col roul/i;
 /** Il capo è fuori stagione? `freddo` = si sta componendo per i mesi freddi. Vale solo per le proposte, non per la ricerca. */
-export const fuoriStagione = (capo, freddo) => (freddo ? DA_CALDO : DA_FREDDO).test(capo.t);
+export const fuoriStagione = (capo, freddo) => (freddo ? DA_CALDO : DA_FREDDO).test(capo.t) ||
+  // d'inverno un abito senza maniche o a maniche corte è da estate, salvo che sia di lana o velluto
+  (!!freddo && capo.c === "abito" && (capo.w === "senza" || capo.w === "corte") && !["lana", "cashmere", "velluto"].includes(capo.f));
 
 // ---------- comporre ----------
 const PESO = { capospalla: 0.35, sopra: 0.20, sotto: 0.22, scarpe: 0.23, abito: 0.42 };
 
 /** Generatore casuale con seme, per avere outfit ripetibili nelle prove. */
 export function casuale(seme) {
-  let s = seme >>> 0 || 1;
+  // il seme si mescola e i primi numeri si scartano: con semi piccoli (1, 2, 3…) il primo numero era sempre vicino a 0,
+  // e "Nuovo look" proponeva sempre un abito
+  let s = Math.imul(seme >>> 0 || 1, 2654435761) >>> 0 || 1;
+  for (let i = 0; i < 8; i++) { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; }
   return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
 }
 
@@ -135,11 +163,14 @@ export function punteggio(capo, scelti, ctx) {
     if (!accesi.length) p += altri.includes("fantasia") ? -1 : 1;
     else p += accesi.every(s => dist(lab(s.x), lab(capo.x)) < 22) ? 0.5 : -7;
   }
-  // palette: conta per ciò che sta vicino al viso
+  // palette: conta per ciò che sta vicino al viso (un colore stimato dalla foto vale poco)
   if (profilo.stagione && ["sopra", "abito", "capospalla"].includes(postoDi(capo))) {
     const d = distPalette(capo, profilo.stagione), peso = capo.m ? 0.5 : 1;
-    if (d !== null) p += (d < 18 ? 2 : d < 30 ? 1 : -1.5) * peso;
+    if (d !== null) p += (d < 18 ? 2 : d < 30 ? 1 : -3) * peso;
   }
+  if (ctx.elegante) p += registro(capo) === 3 ? 2 : 0;               // per una sera si preferisce il capo più elegante
+  // eleganza: una felpa non va con un pantalone sartoriale (Andrea 20/11)
+  for (const s of scelti) { const d = Math.abs(registro(s) - registro(capo)); p -= d >= 2 ? 6 : d * 0.8; }
   return p;
 }
 
@@ -181,7 +212,7 @@ export function componi(capi, ctx, partenza = outfitVuoto(), bloccati = new Set(
   const stileGuida = profilo.stili?.length ? profilo.stili[Math.floor(rnd() * profilo.stili.length)]
     : capiDi(o).length ? negozi[capiDi(o)[0].n].stile : COMUNI[Math.floor(rnd() * COMUNI.length)];
   const c2 = { ...ctx, stileGuida };
-  const manca = [];
+  const manca = [], largo = [], fuoriPalette = [];
   let resto = profilo.budget - totale(o);
 
   daFare.forEach((posto, i) => {
@@ -192,8 +223,22 @@ export function componi(capi, ctx, partenza = outfitVuoto(), bloccati = new Set(
     const pesi = [posto, ...dopo].reduce((t, p) => t + PESO[p], 0);
     const obiettivo = Math.max(minimo(posto), resto * PESO[posto] / pesi);
     const scelti = capiDi(o);
-    const cand = per[posto].filter(c => c.e <= tetto);
+    let cand = per[posto].filter(c => c.e <= tetto);
     if (!cand.length) { if (posto !== "capospalla") manca.push({ posto, daEuro: minimo(posto) }); return; }
+    // stile e colori sono vincoli, non suggerimenti: si allarga solo se nel budget non resta niente (e lo si dice)
+    // la palette conta più del negozio (Andrea 20/11: "solo cose che vanno bene con l'armocromia")
+    const gradi = [
+      c => nelloStile(c, profilo.stili, negozi, true) && inPalette(c, profilo.stagione, posto),
+      c => nelloStile(c, profilo.stili, negozi, false) && inPalette(c, profilo.stagione, posto),
+      c => eleganzaOk(c, profilo.stili) && inPalette(c, profilo.stagione, posto),
+      c => nelloStile(c, profilo.stili, negozi, false),
+      c => eleganzaOk(c, profilo.stili),
+    ];
+    let g = gradi.findIndex(f => cand.filter(f).length >= 3);
+    if (g < 0) g = gradi.findIndex(f => cand.some(f));
+    if (g >= 0) cand = cand.filter(gradi[g]);
+    if (g < 0 || g >= 2 && profilo.stili?.length) largo.push(posto);
+    if ((g < 0 || g >= 3) && profilo.stagione && ["sopra", "abito", "capospalla"].includes(posto)) fuoriPalette.push(posto);
     const valutati = cand.map(c => {
       const r = c.e / obiettivo;                         // meglio usare il budget che prendere il capo più economico
       const prezzo = r > 1.15 ? -(r - 1.15) * 6 : r < 0.45 ? -(0.45 - r) * 4 : 0;
@@ -203,7 +248,13 @@ export function componi(capi, ctx, partenza = outfitVuoto(), bloccati = new Set(
     o[posto] = scelto;
     resto -= scelto.e;
   });
-  return { outfit: o, manca };
+  return { outfit: o, manca, largo, fuoriPalette };
+}
+/** Colore adatto alla stagione per ciò che sta vicino al viso: neutro o vicino alla palette, e dichiarato dal negozio. */
+export function inPalette(capo, stagione, posto = postoDi(capo)) {
+  if (!stagione || !["sopra", "abito", "capospalla"].includes(posto)) return true;
+  if (capo.m || !capo.x) return false;
+  return tipoColore(capo) === "neutro" || distPalette(capo, stagione) < 30;
 }
 
 /** Alternative per un posto, in ordine di abbinamento col resto dell'outfit. `entro` = quanto si può spendere per quel posto. */
@@ -214,7 +265,8 @@ export function alternative(capi, ctx, outfit, posto, entro) {
   const c2 = { ...ctx, stileGuida };
   return capi
     .filter(c => postoDi(c) === posto && !esclusi.has(chiave(c)) && haTaglia(c, profilo) && !(profilo.genere === "u" && c.c === "gonna"))
-    .map(c => [punteggio(c, altri, c2) - (c.e > entro ? 100 : 0) - (fuoriStagione(c, profilo.freddo ?? profilo.conCapospalla) ? 4 : 0), c])
+    .map(c => [punteggio(c, altri, c2) - (c.e > entro ? 100 : 0) - (fuoriStagione(c, profilo.freddo ?? profilo.conCapospalla) ? 4 : 0)
+      - (nelloStile(c, profilo.stili, ctx.negozi, false) ? 0 : 8) - (inPalette(c, profilo.stagione, posto) ? 0 : 4), c])
     .sort((a, b) => b[0] - a[0] || a[1].e - b[1].e)
     .map(x => x[1]);
 }

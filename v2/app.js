@@ -16,7 +16,7 @@ profilo.freddo = mesiFreddi();            // la stagione viene dal calendario; "
 let outfit = S.outfitVuoto();
 let bloccati = new Set(salvato.bloccati || []);
 let salvati = salvato.salvati || [];          // [{ capi: [chiavi], quando }]
-let DATI = null, INDICE = new Map(), esclusi = new Set(), manca = [];
+let DATI = null, INDICE = new Map(), esclusi = new Set(), manca = [], largo = [], fuoriPal = [];
 let seme = Date.now() % 1e9;
 let genereDati = null, daProvare = null, vistaAvatar = 0;
 
@@ -137,15 +137,26 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") { if ($("fog
 // ======================================================================
 // PROFILO — quattro passi, poi si entra con un look già composto
 // ======================================================================
-const PASSI = ["chi", "taglie", "colori", "budget"];
+const PASSI = ["benvenuto", "chi", "taglie", "colori", "budget"];   // il benvenuto non conta tra i passi
 let passo = 0, daProfilo = false;
 
 function disegnaPasso() {
   const el = $("passo"), nome = PASSI[passo];
-  const dove = `<div class="dove"><span>${passo > 0 ? `<button class="testo-link" id="indietro">← Indietro</button>` : "Camerino"}</span><span>${passo + 1} di ${PASSI.length}</span></div>`;
+  const dove = `<div class="dove"><span>${passo > 1 ? `<button class="testo-link" id="indietro">← Indietro</button>` : "Camerino"}</span><span>${passo} di ${PASSI.length - 1}</span></div>`;
   const avanti = (testo, ok = true) => `<div class="piede"><button class="pieno" id="avanti" ${ok ? "" : "disabled"}><span>${testo}</span><span>→</span></button></div>`;
   const scelte = (id, valori, attuale) => `<div class="scelte" id="${id}">${valori.map(v => `<button data-v="${v}" aria-pressed="${attuale === v}">${v}</button>`).join("")}</div>`;
 
+  // Andrea 20/11: chi apre l'app senza spiegazioni non capisce cos'è → prima di tutto due righe chiare
+  if (nome === "benvenuto") {
+    el.innerHTML = `<div class="benvenuto">
+      <img src="esempio-addosso.jpg" alt="Un look completo indossato dall'avatar">
+      <div><p class="dove"><span>Camerino</span></p>
+        <h1>Il tuo stylist personale</h1>
+        <p>Ti prepara look completi con capi veri, in vendita adesso nella tua taglia, da più di 70 marchi.</p>
+        <p>Li provi addosso al tuo avatar, li cambi capo per capo e li compri direttamente sul sito del marchio.</p>
+        <p class="sotto">Serve un minuto. Niente account: i tuoi dati restano su questo telefono.</p></div></div>
+      ${avanti("Inizia")}`;
+  }
   if (nome === "chi") {
     el.innerHTML = `${dove}<h1>Donna o uomo?</h1>
       <div class="grandi" id="genere">
@@ -193,7 +204,9 @@ function disegnaPasso() {
         const r = await stagioneDaFoto(f);
         if (!r) { out.textContent = "Qui non vedo un viso. Prova con una foto di fronte, in buona luce."; return; }
         if (profilo.stagione !== r.stagione) segna(r.stagione);
-        out.innerHTML = `Dalla foto: <b>${S.STAGIONI[r.stagione].nome}</b>. È una stima, la luce può ingannare: se non ti convince cambiala qui sopra.`;
+        out.innerHTML = r.alternativa
+          ? `Dalla foto: <b>${S.STAGIONI[r.stagione].nome}</b> o <b>${S.STAGIONI[r.alternativa].nome}</b>. La foto non basta a decidere: guarda i colori qui sopra e scegli quella in cui ti ritrovi.`
+          : `Dalla foto: <b>${S.STAGIONI[r.stagione].nome}</b>. È una stima${r.luce ? `: ho corretto la luce ${r.luce} della foto` : ", la luce può ingannare"}. Se non ti convince cambiala qui sopra.`;
       } catch { out.textContent = "Non riesco a leggere la foto. Scegli tu qui sopra."; }
     };
   }
@@ -216,7 +229,7 @@ function disegnaPasso() {
   };
   $("passo").scrollTop = 0;
 }
-function apriProfilo() { daProfilo = profilo.pronto; passo = 0; mostra("s-profilo"); disegnaPasso(); }
+function apriProfilo() { daProfilo = profilo.pronto; passo = daProfilo ? 1 : 0; mostra("s-profilo"); disegnaPasso(); }
 
 // ======================================================================
 // IL MIO ACCOUNT — si guarda e si modifica sul posto; la ✕ riporta dove eri
@@ -268,7 +281,7 @@ function apriAccount(prima = JSON.stringify(profilo)) {
   corpo.querySelector("#a-capospalla").onchange = e => { profilo.conCapospalla = e.target.checked; };
   // alla chiusura: si salva e il camerino si aggiorna; se è cambiato il genere si riparte con un look nuovo
   alChiudere = () => {
-    if (!profilo.scarpa) { daProfilo = false; passo = 1; mostra("s-profilo"); disegnaPasso(); outfit = S.outfitVuoto(); bloccati.clear(); DATI = null; return; }   // ha cambiato genere senza scegliere il numero
+    if (!profilo.scarpa) { daProfilo = false; passo = 2; mostra("s-profilo"); disegnaPasso(); outfit = S.outfitVuoto(); bloccati.clear(); DATI = null; return; }   // ha cambiato genere senza scegliere il numero
     if (JSON.stringify(profilo) === prima) return;
     const cambiatoGenere = JSON.parse(prima).genere !== profilo.genere;
     ricorda();
@@ -303,7 +316,7 @@ async function entra() {
     salvato.outfit = null;
   }
   if (daProvare) {                       // look arrivato da un link: lo si indossa al posto di comporne uno
-    outfit = S.outfitVuoto(); bloccati.clear(); manca = [];
+    outfit = S.outfitVuoto(); bloccati.clear(); manca = []; largo = []; fuoriPal = [];
     for (const k of daProvare) { const c = INDICE.get(k); if (c) outfit = S.metti(outfit, c).outfit; }
     daProvare = null; history.replaceState(null, "", location.pathname); ricorda();
   }
@@ -317,9 +330,9 @@ async function componi(avvisa = true) {
   const prima = outfit;
   const posti = new Set([...bloccati].filter(p => outfit[p]));
   const r = S.componi(DATI.capi, ctx(), outfit, posti, S.casuale(++seme));
-  outfit = r.outfit; manca = r.manca;
+  outfit = r.outfit; manca = r.manca; largo = r.largo.filter(p => outfit[p]); fuoriPal = r.fuoriPalette.filter(p => outfit[p]);
   disegna(); ricorda();
-  if (avvisa && S.capiDi(prima).length) toast("Nuovo look", () => { outfit = prima; manca = []; disegna(); ricorda(); });
+  if (avvisa && S.capiDi(prima).length) toast("Nuovo look", () => { outfit = prima; manca = []; largo = []; fuoriPal = []; disegna(); ricorda(); });
   // verifica dal vivo: un capo esaurito o sparito viene sostituito, senza sforare
   for (let giro = 0; giro < 3; giro++) {
     const mio = outfit, esiti = await Promise.all(S.capiDi(mio).map(c => posti.has(S.postoDi(c)) ? null : verifica(c)));
@@ -361,6 +374,10 @@ function disegna() {
   let avviso = "";
   if (m.length && manca.length) avviso = `Con ${euro(profilo.budget)} il look non si chiude: ${manca.map(x => `${S.NOME_POSTO[x.posto].toLowerCase()} da ${euro(x.daEuro)}`).join(", ")}. Alza il budget o scegli un capo meno caro.`;
   else if (m.length) avviso = `Manca${m.length > 1 || m[0] === "scarpe" ? "no" : ""} ${nomi.join(m.length > 2 ? ", " : " e ")}.`;
+  else if (largo.length && profilo.stili.length) {
+    const cosa = largo.map(p => ({ capospalla: "la giacca", sopra: "il sopra", sotto: "il sotto", scarpe: "le scarpe", abito: "l'abito" })[p]);
+    avviso = `Con ${euro(profilo.budget)} non trovo ${cosa.join(" e ")} nel tuo stile (${profilo.stili.join(", ")}): ho messo ${largo.length > 1 || largo[0] === "scarpe" ? "i più vicini" : "il più vicino"}.`;
+  } else if (fuoriPal.length && profilo.stagione) avviso = `Con ${euro(profilo.budget)} non trovo tutto nei colori della tua stagione (${S.STAGIONI[profilo.stagione].nome}): alzando il budget ce ne sono di più.`;
   $("avviso").hidden = !avviso; $("avviso").textContent = avviso;
 
   const p = $("principale");
@@ -517,7 +534,7 @@ $("altro").onclick = () => componi(true);
 /** Mette un capo nel look, con "Annulla" e l'avviso se ha sostituito altro. */
 function indossa(capo) {
   const prima = outfit, r = S.metti(outfit, capo);
-  outfit = r.outfit; manca = [];
+  outfit = r.outfit; manca = []; largo = []; fuoriPal = [];
   for (const p of [...bloccati]) if (!outfit[p]) bloccati.delete(p);
   ricorda(); disegna();
   const tolti = r.tolti.filter(t => S.postoDi(t) !== S.postoDi(capo));
@@ -544,7 +561,7 @@ function apriSalvati() {
     if (b.dataset.via) { salvati.splice(+b.dataset.via, 1); ricorda(); apriSalvati(); disegnaPalco(); return; }
     const prima = outfit; outfit = S.outfitVuoto();
     for (const k of salvati[+b.dataset.indossa].capi) { const c = INDICE.get(k); if (c) outfit = S.metti(outfit, c).outfit; }
-    bloccati.clear(); manca = []; ricorda(); mostra("s-camerino"); disegna(); chiudiFoglio();
+    bloccati.clear(); manca = []; largo = []; fuoriPal = []; ricorda(); mostra("s-camerino"); disegna(); chiudiFoglio();
     toast("Fatto", () => { outfit = prima; ricorda(); disegna(); });
   };
 }
@@ -567,6 +584,10 @@ const NOMI_FILTRI = {
   l: { corta: "Corta", normale: "Normale", lunga: "Lunga" },
   w: { senza: "Senza maniche", corte: "Maniche corte", "3/4": "Maniche 3/4", lunghe: "Maniche lunghe" },
   z: { v: "Scollo a V", giro: "Girocollo", alto: "Collo alto", quadrato: "Scollo quadrato", spalle: "Spalle scoperte", americana: "All'americana" },
+  r: { "3": "Elegante", "2": "Curato", "1": "Casual", "0": "Sportivo" },
+  y: { stivali: "Stivali", stivaletti: "Stivaletti", "décolleté": "Décolleté e tacchi", sneakers: "Sneakers", mocassini: "Mocassini e stringate",
+    ballerine: "Ballerine", sandali: "Sandali", mules: "Mules e sabot" },
+  u: { basso: "Basso (meno di 3 cm)", medio: "Medio (3–7 cm)", alto: "Alto (oltre 7 cm)" },
   prezzo: { p1: "Fino a 50 €", p2: "50–100 €", p3: "100–200 €", p4: "200–400 €", p5: "Oltre 400 €" },
 };
 const FASCE = { p1: [0, 50], p2: [50, 100], p3: [100, 200], p4: [200, 400], p5: [400, Infinity] };
@@ -577,7 +598,8 @@ const LAB_FILTRO = Object.fromEntries(COLORI_FILTRO.map(([v, hex]) => [v, S.lab(
 const ORDINI = [["consigliati", "Consigliati"], ["prezzo-su", "Prezzo crescente"], ["prezzo-giu", "Prezzo decrescente"], ["sconto", "Sconto più alto"]];
 /** I filtri nell'ordine in cui si vedono; `per` dice in quali posti hanno senso. */
 const GRUPPI = [
-  { k: "colore", nome: "Colore" }, { k: "prezzo", nome: "Prezzo" }, { k: "marca", nome: "Marca" },
+  { k: "y", nome: "Tipo", per: p => p === "scarpe" }, { k: "u", nome: "Tacco", per: p => p === "scarpe" },
+  { k: "colore", nome: "Colore" }, { k: "prezzo", nome: "Prezzo" }, { k: "marca", nome: "Marca" }, { k: "r", nome: "Occasione" },
   { k: "f", nome: "Materiale", per: p => p !== "scarpe" }, { k: "q", nome: "Fantasia", per: p => p !== "scarpe" },
   { k: "a", nome: "Vestibilità", per: p => p !== "scarpe" }, { k: "l", nome: "Lunghezza", per: p => ["sotto", "abito", "capospalla"].includes(p) },
   { k: "w", nome: "Maniche", per: p => ["sopra", "abito"].includes(p) }, { k: "z", nome: "Scollo", per: p => ["sopra", "abito"].includes(p) },
@@ -588,13 +610,15 @@ const copiaFiltri = st => ({ ...Object.fromEntries(CHIAVI.map(k => [k, new Set(s
 const gruppiPer = posto => GRUPPI.filter(g => !g.per || g.per(posto));
 /** Toglie i filtri che non hanno senso nel nuovo posto (es. le maniche passando ai pantaloni). */
 function adattaFiltri(st, posto) { const ok = new Set(gruppiPer(posto).map(g => g.k)); for (const k of CHIAVI) if (!ok.has(k)) st[k].clear(); }
-const vicinoA = (c, hex) => c.x && Math.hypot(...S.lab(c.x).map((v, i) => v - S.lab(hex)[i])) < 16;
-const colorePassa = (c, v) => c.x && Math.hypot(...S.lab(c.x).map((x, i) => x - LAB_FILTRO[v][i])) < 16;
+// il colore stimato dalla foto (m) non entra nei filtri: le foto con modella e sfondo ingannano (Andrea 20/11: "nero" e uscivano abiti chiari)
+const vicinoA = (c, hex) => !c.m && c.x && Math.hypot(...S.lab(c.x).map((v, i) => v - S.lab(hex)[i])) < 16;
+const colorePassa = (c, v) => !c.m && c.x && Math.hypot(...S.lab(c.x).map((x, i) => x - LAB_FILTRO[v][i])) < 16;
 /** Un valore del capo per un filtro (per contare e filtrare). */
 function passaUno(c, k, v) {
   if (k === "colore") return colorePassa(c, v);
   if (k === "prezzo") return c.e >= FASCE[v][0] && c.e < FASCE[v][1];
   if (k === "marca") return c.n === +v;
+  if (k === "r") return String(S.registro(c)) === v;
   if (k === "l") return v === "normale" ? !c.l || c.l === "media" : c.l === v;
   return c[k] === v;
 }
@@ -1129,7 +1153,8 @@ function vaPerRichiesta(c, r) {
   if (r.abito === true && (p === "sopra" || p === "sotto")) return false;
   if (r.abito === false && p === "abito") return false;
   if (r.stili?.length && p !== "scarpe" && !r.stili.includes(DATI.negozi[c.n].stile)) return false;   // lo stile chiesto conta davvero (se manca, il posto si allarga)
-  if (r.elegante && p !== "scarpe" && /\b(t-?shirt|tee|hoodie|sweatshirt|sudadera|jogger|sweat ?pants?|track|legging|cargo|active|zip-?up|fleece|windbreaker|anorak|puffer|bomber|sport|felpa|chándal|sudadera|basico tinto)/i.test(c.t)) return false;
+  if (r.elegante && S.registro(c) < 2) return false;                      // per una cena: niente casual né sportivo, scarpe comprese
+  if (r.elegante && p !== "scarpe" && /\b(t-?shirt|t shirt|tee|hoodie|sweatshirt|sudadera|jogger|sweat ?pants?|track|legging|cargo|active|zip-?up|fleece|windbreaker|anorak|puffer|bomber|sport|felpa|chándal|sudadera|basico tinto)/i.test(c.t)) return false;
   if (!pz) return true;
   if (pz.tipo) {
     if (p === "scarpe" && !RX_SCARPE[pz.tipo]?.test(c.t)) return false;
@@ -1148,7 +1173,7 @@ function lookPerRichiesta(r) {
   if (r.abito == null && (pezzo(r.sopra) || pezzo(r.sotto))) r = { ...r, abito: false };   // ha chiesto un sopra o un sotto: niente abito al loro posto
   if (r.abito == null && pezzo(r.abito_dettagli)) r = { ...r, abito: true };
   const tmp = { ...profilo, budget: r.budget || profilo.budget, stili: r.stili?.length ? r.stili : profilo.stili, conCapospalla: r.giacca ?? profilo.conCapospalla };
-  const c2 = { profilo: tmp, negozi: DATI.negozi, esclusi };
+  const c2 = { profilo: tmp, negozi: DATI.negozi, esclusi, elegante: !!r.elegante };
   const larghi = { abito: r.abito, elegante: r.elegante };     // allargando si lasciano cadere stile e dettagli, non l'occasione
   const usabile = c => !esclusi.has(S.chiave(c)) && S.haTaglia(c, tmp) && !S.fuoriStagione(c, tmp.freddo);
   // per ogni posto si allarga per gradi finché ci sono almeno 3 capi nella taglia e nel budget: tutto → senza stile → solo il tipo di capo → solo l'occasione
@@ -1217,7 +1242,7 @@ function apriStylist() {
     if (ri) {
       outfit = S.outfitVuoto();
       for (const k of chat[+ri.dataset.rimetti].capi) { const c = INDICE.get(k); if (c) outfit = S.metti(outfit, c).outfit; }
-      bloccati.clear(); manca = []; ricorda(); chiudiFoglio(); mostra("s-camerino"); disegna();
+      bloccati.clear(); manca = []; largo = []; fuoriPal = []; ricorda(); chiudiFoglio(); mostra("s-camerino"); disegna();
     }
   };
 }
@@ -1305,7 +1330,7 @@ async function apriCondiviso(link) {
     if (altroGenere) return proprio();
     daProvare = trovati.map(S.chiave);
     if (profilo.pronto) entra();
-    else { profilo.genere = link.g; daProfilo = false; passo = 1; mostra("s-profilo"); disegnaPasso(); }
+    else { profilo.genere = link.g; daProfilo = false; passo = 2; mostra("s-profilo"); disegnaPasso(); }
   };
 }
 

@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { fuoriStagione, componi, alternative, metti, totale, completo, mancanti, outfitVuoto, capiDi, haTaglia, postoDi, casuale, tipoColore, chiave } from "./stylist.js";
+import { registro, nelloStile, inPalette, fuoriStagione, componi, alternative, metti, totale, completo, mancanti, outfitVuoto, capiDi, haTaglia, postoDi, casuale, tipoColore, chiave } from "./stylist.js";
 
 const carica = g => JSON.parse(readFileSync(new URL(`../data/v2-${g}.json`, import.meta.url)));
 const DONNA = carica("donna"), UOMO = carica("uomo");
@@ -111,5 +111,54 @@ test("senza capospalla ma d'inverno: comunque niente shorts né sandali", () => 
     const { outfit } = componi(DONNA.capi, { profilo: p, negozi: DONNA.negozi }, outfitVuoto(), new Set(), casuale(s));
     assert.equal(outfit.capospalla, null);
     for (const c of capiDi(outfit)) assert.ok(!/sandal|shorts?\b/i.test(c.t), `seme ${s}: ${c.t}`);
+  }
+});
+
+// ---- Andrea 20/11: "lusso italiano" non deve dare capi hip hop o sportivi; palette rispettata; "Nuovo look" non sempre abito
+const lusso = { ...donna, stagione: "inverno", budget: 400, stili: ["Lusso", "Italiano"], freddo: true };
+test("stile Lusso+Italiano: niente capi sportivi, quasi niente casual, quasi sempre nel suo stile", () => {
+  let capi = 0, casual = 0, fuori = 0;
+  for (let s = 1; s <= 100; s++) {
+    for (const c of capiDi(componi(DONNA.capi, { profilo: lusso, negozi: DONNA.negozi }, outfitVuoto(), new Set(), casuale(s)).outfit)) {
+      capi++;
+      assert.ok(registro(c) > 0, `seme ${s}: sportivo ${c.t}`);
+      if (registro(c) === 1) casual++;
+      if (!nelloStile(c, lusso.stili, DONNA.negozi, false)) fuori++;
+    }
+  }
+  assert.ok(casual / capi < 0.15, `${casual} capi casual su ${capi}`);
+  assert.ok(fuori / capi < 0.1, `${fuori} capi fuori stile su ${capi}`);
+});
+test("palette: vicino al viso colori della stagione in almeno 95 capi su 100", () => {
+  let tot = 0, ok = 0;
+  for (let s = 1; s <= 100; s++) {
+    const o = componi(DONNA.capi, { profilo: lusso, negozi: DONNA.negozi }, outfitVuoto(), new Set(), casuale(s)).outfit;
+    for (const p of ["sopra", "abito", "capospalla"]) if (o[p]) { tot++; if (inPalette(o[p], "inverno", p)) ok++; }
+  }
+  assert.ok(ok / tot >= 0.95, `${ok} su ${tot}`);
+});
+test("eleganza coerente: niente felpa con capi eleganti", () => {
+  for (let s = 1; s <= 100; s++) {
+    const reg = capiDi(componi(DONNA.capi, { profilo: { ...donna, stili: [] }, negozi: DONNA.negozi }, outfitVuoto(), new Set(), casuale(s)).outfit).map(registro);
+    assert.ok(!(reg.includes(0) && reg.includes(3)), `seme ${s}: sportivo ed elegante insieme`);
+  }
+});
+test("Nuovo look: a volte abito, più spesso sopra + sotto", () => {
+  let abiti = 0;
+  for (let s = 1; s <= 100; s++) if (componi(DONNA.capi, { profilo: donna, negozi: DONNA.negozi }, outfitVuoto(), new Set(), casuale(s)).outfit.abito) abiti++;
+  assert.ok(abiti > 10 && abiti < 60, `${abiti} abiti su 100`);
+});
+test("d'inverno niente abiti senza maniche o a maniche corte (salvo lana)", () => {
+  assert.ok(fuoriStagione({ t: "Robe Yolie sable", c: "abito", w: "corte" }, true));
+  assert.ok(!fuoriStagione({ t: "Robe en laine", c: "abito", w: "corte", f: "lana" }, true));
+  assert.ok(fuoriStagione({ t: "Modal Halterneck Maxi Dress", c: "abito" }, true));
+});
+test("catalogo: magliette, gonne in maglia e abiti-camicia al posto giusto", () => {
+  const cat = t => DONNA.capi.find(c => c.t === t)?.c;
+  assert.equal(cat("76 Long Sleeve T Shirt"), "top");
+  for (const c of DONNA.capi) {
+    const t = c.t.toLowerCase();
+    if (/\bskirt\b/.test(t) && !/dress/.test(t)) assert.equal(c.c, "gonna", c.t);
+    if (/shirt ?dress|t-shirt dress/.test(t)) assert.equal(c.c, "abito", c.t);
   }
 });

@@ -131,6 +131,19 @@ const EN = {
   "cappotto": "coat", "blazer": "blazer", "trench": "trench", "piumino": "puffer", "cardigan": "cardigan", "felpa": "sweatshirt", "stivali": "boots", "sneakers": "sneakers", "sandali": "sandals",
   "nero": "black", "bianco": "white", "panna": "off-white", "beige": "beige", "cammello": "camel", "marrone": "brown", "grigio": "grey", "navy": "navy", "blu": "blue", "azzurro": "light blue",
   "verde": "green", "oliva": "olive", "rosso": "red", "bordeaux": "burgundy", "rosa": "pink", "arancione": "orange", "giallo": "yellow", "viola": "purple", "lilla": "lilac",
+  // 23/11: benvenuto, filtri scarpe e occasione
+  "Il tuo stylist personale": "Your personal stylist",
+  "Ti prepara look completi con capi veri, in vendita adesso nella tua taglia, da più di 70 marchi.": "It puts together complete looks with real clothes, on sale right now in your size, from more than 70 brands.",
+  "Li provi addosso al tuo avatar, li cambi capo per capo e li compri direttamente sul sito del marchio.": "You try them on your avatar, change them piece by piece and buy them directly on the brand's site.",
+  "Serve un minuto. Niente account: i tuoi dati restano su questo telefono.": "It takes a minute. No account: your data stays on this phone.",
+  "Un look completo indossato dall'avatar": "A complete look worn by the avatar",
+  ". La foto non basta a decidere: guarda i colori qui sopra e scegli quella in cui ti ritrovi.": ". The photo isn't enough to decide: look at the colours above and pick the one that suits you.",
+  " o ": " or ", ": ho corretto la luce calda della foto": ": I corrected the warm light in the photo", ": ho corretto la luce fredda della foto": ": I corrected the cool light in the photo",
+  ". È una stima": ". It's an estimate", ", la luce può ingannare": ", light can be misleading", ". Se non ti convince cambiala qui sopra.": ". If it doesn't convince you, change it above.",
+  "Tipo": "Type", "Tacco": "Heel", "Occasione": "Occasion", "Elegante": "Elegant", "Curato": "Smart", "Casual": "Casual",
+  "Stivali": "Boots", "Stivaletti": "Ankle boots", "Décolleté e tacchi": "Pumps and heels", "Sneakers": "Sneakers", "Mocassini e stringate": "Loafers and lace-ups",
+  "Ballerine": "Ballet flats", "Sandali": "Sandals", "Mules e sabot": "Mules and clogs",
+  "Basso (meno di 3 cm)": "Low (under 3 cm)", "Medio (3–7 cm)": "Mid (3–7 cm)", "Alto (oltre 7 cm)": "High (over 7 cm)",
 };
 const POSTO = { giacca: "jacket", sopra: "top", sotto: "bottom", scarpe: "shoes", abito: "dress", "il sopra": "the top", "il sotto": "the bottom", "le scarpe": "the shoes" };
 const posti = t => t.replace(/il sopra|il sotto|le scarpe|giacca|sopra|sotto|scarpe|abito/g, m => POSTO[m]).replace(/ e /g, " and ");
@@ -142,7 +155,7 @@ const REGOLE = [
   [/^Uso anche le taglie del tuo profilo \((.+) sopra, (.+) sotto\) per le proporzioni\.$/, (_, a, b) => `I also use the sizes in your profile (${a} top, ${b} bottom) for the proportions.`],
   [/^Mostra ([\d.]+) capi$/, (_, n) => `Show ${n} items`], [/^(\d+)–(\d+) €$/, (_, a, b) => `€${a}–${b}`],
   [/^(Consigliati|Prezzo crescente|Prezzo decrescente|Sconto più alto) ▾$/, (_, x) => `${EN[x]} ▾`],
-  [/^(Colore|Prezzo|Marca|Materiale|Fantasia|Vestibilità|Lunghezza|Maniche|Scollo) · (\d+)$/, (_, x, n) => `${EN[x]} · ${n}`],
+  [/^(Colore|Prezzo|Marca|Materiale|Fantasia|Vestibilità|Lunghezza|Maniche|Scollo|Tipo|Tacco|Occasione) · (\d+)$/, (_, x, n) => `${EN[x]} · ${n}`],
   [/^Mancan?o? (.+)\.$/, (_, x) => `Missing: ${posti(x)}.`],
   [/^Con (.+) il look non si chiude: (.+)\. Alza il budget o scegli un capo meno caro\.$/, (_, b, x) => `With ${b} the look can't be completed: ${posti(x).replace(/ da /g, " from ")}. Raise the budget or choose a cheaper item.`],
   [/^Fino a (.+) · ([\d.]+) capi · taglia (.+)$/, (_, a, n, t) => `Up to ${a} · ${n} items · size ${t}`],
@@ -160,6 +173,8 @@ const REGOLE = [
   [/^Vedi sul sito di (.+) ↗$/, (_, x) => `View on ${x}'s site ↗`], [/^Compra su (.+) ↗$/, (_, x) => `Buy on ${x} ↗`],
   [/^Scegli: (.+)$/, (_, x) => `Choose: ${posti(x)}`], [/^(Giacca|Sopra|Sotto|Scarpe|Abito): (.+)$/, (_, p, x) => `${EN[p]}: ${x}`],
   [/^(\d+) \/ (\d+)$/, m => m],
+  [/^Con (.+) non trovo tutto nei colori della tua stagione \((.+)\): alzando il budget ce ne sono di più\.$/, (_, b, st) => `With ${b} I can't find everything in your season's colours (${EN[st] || st}): a higher budget gives more choice.`], [/^(\d+) di (\d+)$/, (_, a, b) => `${a} of ${b}`],
+  [/^Con (.+) non trovo (.+) nel tuo stile \((.+)\): ho messo (i più vicini|il più vicino)\.$/, (_, b, x, st) => `With ${b} I can't find ${x.replace(/la giacca/, "a jacket").replace(/il sopra/, "a top").replace(/il sotto/, "a bottom").replace(/le scarpe/, "shoes").replace(/l'abito/, "a dress").replace(/ e /g, " and ")} in your style (${st.split(", ").map(z => EN[z] || z).join(", ")}): I picked the closest.`],
 ];
 export function tr(testo) {
   if (LINGUA === "it" || !testo) return testo;

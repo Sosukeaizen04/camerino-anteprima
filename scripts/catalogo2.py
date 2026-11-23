@@ -28,7 +28,7 @@ RX_SCARPE = re.compile(r"\b(shoes?|sneakers?|trainers?|boots?|booties?|bottes?|b
 RX_FUORI = re.compile(r"\b(bag|bags|borsa|sac|bolso|tote|clutch|pouch|belt|ceinture|cintura|earring|necklace|bracelet|ring|jewel|bijou|"
                       r"scarf|sciarpa|foulard|echarpe|hat|cap|beanie|bonnet|sock|socks|chaussette|calz|gift|card|candle|sunglass|lunette|"
                       r"keyring|charm|hair|swim|bikini|maillot|underwear|lingerie|bra\b|brief|culotte|perfume|parfum|towel|mask|glove|gant|"
-                      r"blanket|skullcap|balaclava|patron de couture|sewing pattern|\bpdf\b|cartamodell|guantes?|gloves?|mittens?|keychain|key ?ring|headband|head ?scarf|bandana|beret|scrunchie|hair ?clip|bucket hat|llavero|\bthrow\b|kids?\b|baby|bebe|enfant|toddler|infant|pj\b|pyjama|pajama|sleep|robe de chambre|gift card|final sale item|laces?|insoles?|shoe care)")
+                      r"blanket|snood|scaldacollo|neck ?warmer|\bcombs?\b|hairbrush|spazzola|skullcap|balaclava|patron de couture|sewing pattern|knitting pattern|crochet pattern|\bclasp\b|\bpdf\b|cartamodell|guantes?|gloves?|mittens?|keychain|key ?ring|headband|head ?scarf|bandana|beret|scrunchie|hair ?clip|bucket hat|llavero|\bthrow\b|kids?\b|baby|bebe|enfant|toddler|infant|pj\b|pyjama|pajama|sleep|robe de chambre|gift card|final sale item|laces?|insoles?|shoe care)")
 
 NUMERI_SCARPE = list(range(35, 48))  # taglie europee 35–47
 
@@ -55,12 +55,16 @@ def genere(p, dominio, misto):
 
 # casi che le regole di catalogo.py sbagliano: prima queste, poi le sue
 PRIMA = [
+    ("abito", r"\bdress(es)?\b|(mini|midi|maxi)dress|shirt ?dress|\bjumpsuit|\bplaysuit|\bgown\b"),
     ("top", r"\bvest top|\btank top|\bcami top"),
     ("pantaloni", r"sweat ?pants?|track ?pants?|\bjoggers?\b|\bleggings?\b|\bchándal\b"),
     ("capospalla", r"overshirt|shacket|\bcazadora|\bgabardina|\babrigo|\bchaleco|\bparka"),
     ("maglia", r"\bsudadera|\bjers[eé]is?\b|\bc[aá]rdigan|\bsu[eé]ter|\bstrick|\bpulli"),
-    ("top", r"\bcamiseta|\bt-shirt"),
+    ("top", r"\bcamiseta|\bt-?shirts?\b|\bt shirts?\b|\btshirts?\b|long ?sleeve tee|baby tee"),
     ("jeans", r"\bvaqueros?\b"),
+    # "knit skirt", "knit pants": la parola del capo vince su "knit" (prima finivano tra le maglie, quindi nel sopra)
+    ("gonna", r"\bskirts?\b|\bskorts?\b|\bjupe\b|\bgonna\b|\bfalda\b|\bminigonna"),
+    ("pantaloni", r"\bpants?\b|\btrousers?\b|\bpantal[oó]n|\bpantalone|\bjoggers?\b"),
 ]
 
 
@@ -204,6 +208,82 @@ def scollo(p, cat):
     return next((nome for nome, rx in SCOLLI if re.search(rx, t)), None)
 
 
+# ---------- quanto è elegante un capo (Andrea 20/11: "se scelgo elegante non deve uscire una maglietta sportiva") ----------
+# 0 sportivo · 1 casual · 2 curato · 3 elegante. Dal titolo e dal tipo prodotto, poi materiale e categoria; lo stile del
+# negozio limita solo i casi estremi (un negozio sportivo non fa capi da sera). Regole, non indovinare: nel dubbio "curato".
+RX_SPORT = re.compile(r"legging|sweat ?pants?|track ?(pants?|suit|jacket|top)|jogger|hoodie|hoody|sweatshirt|sweat\b|zip[- ]?up|"
+                      r"sports? bra|activewear|\bactive\b|bike short|biker short|running|\bgym\b|yoga|tennis|fleece|"
+                      r"\bsudadera|chándal|felpa|unitard|onesie|windbreaker|anorak|\bteddy\b")
+RX_CASUAL = re.compile(r"zapatilla|deportiv|\bt-?shirts?\b|\bt shirts?\b|\btshirt|\btees?\b|tee-shirt|tank|graphic|\blogo|varsity|collegiate|"
+                       r"\bcrop|baby tee|\bshorts?\b|cargo|overall|dungaree|\bcamo\b|distressed|ripped|\bdenim\b|\bjeans?\b|"
+                       r"sneakers?|baskets|slides?|flip|clogs?|espadrill|\bpolo\b|rugby|henley|thermal|waffle|jersey dress|"
+                       r"\bbucket\b|puffer|bomber|parka|rain|camiseta|vaquer|\bfun\b|slogan|print tee|souvenir")
+RX_ELEGANTE = re.compile(r"\bgown|evening|cocktail|sequin|paillette|satin|silk|\bsoie\b|\bseta\b|velvet|velours|velluto|lace\b|dentelle|"
+                         r"pizzo|tailored|tuxedo|smoking|blazer|\btrousers?\b|pleated|plissé|pumps?\b|stiletto|slingback|heels?\b|"
+                         r"escarpin|d[ée]collet|corset|bustier|draped|drapé|organza|chiffon|tulle|crepe|crêpe|cady|brocade|jacquard|"
+                         r"cashmere|cachemire|camel coat|wrap coat|wool coat|cappotto|manteau|\bcoat\b|trench|mary jane|kitten")
+STILI_SPORT = {"Sportivo"}
+STILI_STRADA = {"Streetwear", "Rock"}
+
+
+def registro(p, cat, stile):
+    """0 sportivo, 1 casual, 2 curato, 3 elegante."""
+    t = f"{p['title']} {p['product_type']}".lower()
+    if RX_SPORT.search(t):
+        r = 0
+    elif RX_ELEGANTE.search(t) and not RX_CASUAL.search(t):
+        r = 3
+    elif RX_CASUAL.search(t):
+        r = 1
+    else:
+        r = {"top": 1, "jeans": 1, "scarpe": 2}.get(cat, 2)
+    if stile in STILI_SPORT:
+        r = min(r, 1)
+    elif stile in STILI_STRADA:
+        r = min(r, 2)
+    return r
+
+
+TIPI_SCARPE = [  # (nome nell'app, parole) — vince la prima che si trova
+    ("stivaletti", r"ankle[\w -]{0,20}boot|bootie|bottine|stivalett|chelsea|botín"),
+    ("stivali", r"\bboots?\b|bottes?\b|stival|botas?\b"),
+    ("sneakers", r"sneaker|trainer|baskets?\b|running|tennis|zapatilla"),
+    ("décolleté", r"\bpumps?\b|escarpin|d[ée]collet|stiletto|slingback|\bheels?\b"),
+    ("sandali", r"sandal|espadrill"),
+    ("mocassini", r"loafer|mocassin|moccasin|derby|derbies|oxford|brogue"),
+    ("ballerine", r"ballet|ballerin|mary jane|\bflats?\b"),
+    ("mules", r"\bmules?\b|\bclogs?\b|sabot|slides?\b"),
+]
+
+
+def tipo_scarpa(p):
+    t = f"{p['title']} {p['product_type']} {p['handle'].replace('-', ' ')}".lower()
+    return next((n for n, rx in TIPI_SCARPE if re.search(rx, t)), None)
+
+
+def tacco(p):
+    """'basso' (< 3 cm), 'medio' (3–7), 'alto' (> 7) dall'altezza scritta dal negozio, o dalle parole; None se non si sa."""
+    corpo = re.sub(r"<[^>]+>", " ", p.get("body_html") or "").lower()
+    t = f"{p['title']} {corpo}".lower()
+    m = re.search(r"(?:heel|tacco|talon|absatz)[^.]{0,40}?(\d{1,2}(?:[.,]\d)?)\s*cm", t) or \
+        re.search(r"(\d{1,2}(?:[.,]\d)?)\s*cm\s*(?:heel|tacco|talon|absatz)", t)
+    if m:
+        cm = float(m.group(1).replace(",", "."))
+        if 0 < cm < 20:
+            return "basso" if cm < 3 else "medio" if cm <= 7 else "alto"
+    m = re.search(r"(\d(?:\.\d)?)\s*(?:\"|”|inch|in\b)\s*heel|heel[^.]{0,30}?(\d(?:\.\d)?)\s*(?:\"|”|inch)", t)
+    if m:
+        cm = float(m.group(1) or m.group(2)) * 2.54
+        return "basso" if cm < 3 else "medio" if cm <= 7 else "alto"
+    if re.search(r"stiletto|high heel|tacco alto|talon haut", t):
+        return "alto"
+    if re.search(r"kitten heel|block heel|mid heel|low heel", t):
+        return "medio"
+    if re.search(r"\bflat\b|\bflats\b|sneaker|trainer|ballet|ballerin|loafer|mocassin|slide", t):
+        return "basso"
+    return None
+
+
 def numero_scarpa(etichetta, sistema, gen):
     """Taglia europea (35–47) di una variante di scarpa, o None. Le conversioni da US/UK sono indicative."""
     e = etichetta.upper().replace(",", ".")
@@ -306,8 +386,14 @@ def main():
                 pieno = max((float(v.get("compare_at_price") or 0) for v in varianti), default=0)
                 if pieno > prezzo * 1.04:          # in saldo: il negozio mostra il prezzo pieno barrato
                     out[-1]["o"] = round(pieno * cambio)
+                out[-1]["r"] = registro(p, cat, stile)
+                ts = tipo_scarpa(p) if cat == "scarpe" else None
+                tc = tacco(p) if cat == "scarpe" else None
+                if cat == "scarpe" and not tc and ts in ("sneakers", "ballerine", "mocassini"):
+                    tc = "basso"
+                extra = (("y", ts), ("u", tc)) if cat == "scarpe" else ()
                 for chiave, val in (("f", materiale(p)), ("l", lunghezza(p, cat)), ("w", maniche(p, cat)),
-                                    ("q", fantasia(p)), ("a", vestibilita(p, cat)), ("z", scollo(p, cat))):
+                                    ("q", fantasia(p)), ("a", vestibilita(p, cat)), ("z", scollo(p, cat))) + extra:
                     if val:
                         out[-1][chiave] = val
         if gia:
