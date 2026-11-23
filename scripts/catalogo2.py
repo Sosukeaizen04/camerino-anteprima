@@ -28,7 +28,7 @@ RX_SCARPE = re.compile(r"\b(shoes?|sneakers?|trainers?|boots?|booties?|bottes?|b
 RX_FUORI = re.compile(r"\b(bag|bags|borsa|sac|bolso|tote|clutch|pouch|belt|ceinture|cintura|earring|necklace|bracelet|ring|jewel|bijou|"
                       r"scarf|sciarpa|foulard|echarpe|hat|cap|beanie|bonnet|sock|socks|chaussette|calz|gift|card|candle|sunglass|lunette|"
                       r"keyring|charm|hair|swim|bikini|maillot|underwear|lingerie|bra\b|brief|culotte|perfume|parfum|towel|mask|glove|gant|"
-                      r"blanket|snood|scaldacollo|neck ?warmer|\bcombs?\b|hairbrush|spazzola|skullcap|balaclava|patron de couture|sewing pattern|knitting pattern|crochet pattern|\bclasp\b|\bpdf\b|cartamodell|guantes?|gloves?|mittens?|keychain|key ?ring|headband|head ?scarf|bandana|beret|scrunchie|hair ?clip|bucket hat|llavero|\bthrow\b|kids?\b|baby|bebe|enfant|toddler|infant|pj\b|pyjama|pajama|sleep|robe de chambre|gift card|final sale item|laces?|insoles?|shoe care)")
+                      r"blanket|leg ?warmers?|arm ?warmers?|scaldamuscoli|gaiters?|snood|scaldacollo|neck ?warmer|\bcombs?\b|hairbrush|spazzola|skullcap|balaclava|patron de couture|sewing pattern|knitting pattern|crochet pattern|\bclasp\b|\bpdf\b|cartamodell|guantes?|gloves?|mittens?|keychain|key ?ring|headband|head ?scarf|bandana|beret|scrunchie|hair ?clip|bucket hat|llavero|\bthrow\b|kids?\b|baby|bebe|enfant|toddler|infant|pj\b|pyjama|pajama|sleep|robe de chambre|gift card|final sale item|laces?|insoles?|shoe care)")
 
 NUMERI_SCARPE = list(range(35, 48))  # taglie europee 35–47
 
@@ -57,6 +57,9 @@ def genere(p, dominio, misto):
 PRIMA = [
     ("abito", r"\bdress(es)?\b|(mini|midi|maxi)dress|shirt ?dress|\bjumpsuit|\bplaysuit|\bgown\b"),
     ("top", r"\bvest top|\btank top|\bcami top"),
+    # la parola del capo vince sul tessuto ("pantalone in gabardina" non è un trench) e su "knit"
+    ("gonna", r"\bskirts?\b|\bskorts?\b|\bjupe\b|\bgonna\b|\bfalda\b|\bminigonna"),
+    ("pantaloni", r"\bpantal[oó]n|\bpantalone|\btrousers?\b"),
     ("pantaloni", r"sweat ?pants?|track ?pants?|\bjoggers?\b|\bleggings?\b|\bchándal\b"),
     ("capospalla", r"overshirt|shacket|\bcazadora|\bgabardina|\babrigo|\bchaleco|\bparka"),
     ("maglia", r"\bsudadera|\bjers[eé]is?\b|\bc[aá]rdigan|\bsu[eé]ter|\bstrick|\bpulli"),

@@ -114,6 +114,12 @@ export function eleganzaOk(capo, stili) {
   if (stili.every(s => SENZA_SPORT.has(s)) && r === 0) return false;
   return !(stili.every(s => CURATI.has(s)) && r < 2);
 }
+/** Allargando si resta lontani dai negozi di un mondo diverso (rock, streetwear, sportivo) se non li si è scelti. */
+export function compatibile(capo, stili, negozi) {
+  if (!eleganzaOk(capo, stili)) return false;
+  if (!stili?.length || stili.some(s => SCARPE_DI_STRADA.has(s))) return true;
+  return !SCARPE_DI_STRADA.has(negozi[capo.n].stile);
+}
 export function nelloStile(capo, stili, negozi, stretto) {
   if (!stili?.length) return true;
   const st = negozi[capo.n].stile;
@@ -194,7 +200,15 @@ export function componi(capi, ctx, partenza = outfitVuoto(), bloccati = new Set(
     if (profilo.genere === "u" && (p === "abito" || c.c === "gonna")) continue;
     per[p].push(c);
   }
-  const minimo = p => per[p].length ? Math.min(...per[p].map(c => c.e)) : Infinity;
+  // il prezzo minimo da tenere da parte per un posto: quello del capo più economico NELLO STILE (e nei colori), se c'è.
+  // Col minimo di tutto il catalogo giacca e scarpe si prendevano il budget e per il sopra restava solo streetwear economico.
+  const minimoDi = l => l.length ? Math.min(...l.map(c => c.e)) : Infinity;
+  const minimi = {};
+  const minimo = p => minimi[p] ??= [
+    c => nelloStile(c, profilo.stili, negozi, false) && inPalette(c, profilo.stagione, p),
+    c => compatibile(c, profilo.stili, negozi),
+    () => true,
+  ].map(f => minimoDi(per[p].filter(f))).find(Number.isFinite) ?? Infinity;
 
   // quali posti riempire
   let daFare = [];
@@ -230,15 +244,21 @@ export function componi(capi, ctx, partenza = outfitVuoto(), bloccati = new Set(
     const gradi = [
       c => nelloStile(c, profilo.stili, negozi, true) && inPalette(c, profilo.stagione, posto),
       c => nelloStile(c, profilo.stili, negozi, false) && inPalette(c, profilo.stagione, posto),
-      c => eleganzaOk(c, profilo.stili) && inPalette(c, profilo.stagione, posto),
+      c => compatibile(c, profilo.stili, negozi) && inPalette(c, profilo.stagione, posto),
       c => nelloStile(c, profilo.stili, negozi, false),
+      c => compatibile(c, profilo.stili, negozi),
       c => eleganzaOk(c, profilo.stili),
     ];
+    // il grado più fedele che abbia almeno un capo: meglio un solo capo nello stile che tre fuori stile
+    // (prima si cercava il primo grado con 3 capi e si finiva sulle scarpe rock per uno stile lusso)
     let g = gradi.findIndex(f => cand.filter(f).length >= 3);
-    if (g < 0) g = gradi.findIndex(f => cand.some(f));
+    const primo = gradi.findIndex(f => cand.some(f));
+    if (g < 0 || primo < g) g = primo;
+    // varietà: se lo stile esatto ha pochi capi si aggiungono gli stili affini (il punteggio mette comunque prima quelli esatti)
+    if (g === 0 && cand.filter(gradi[0]).length < 8) g = 1;
     if (g >= 0) cand = cand.filter(gradi[g]);
     if (g < 0 || g >= 2 && profilo.stili?.length) largo.push(posto);
-    if ((g < 0 || g >= 3) && profilo.stagione && ["sopra", "abito", "capospalla"].includes(posto)) fuoriPalette.push(posto);
+    if ((g < 0 || g === 3 || g === 4 || g === 5) && profilo.stagione && ["sopra", "abito", "capospalla"].includes(posto)) fuoriPalette.push(posto);
     const valutati = cand.map(c => {
       const r = c.e / obiettivo;                         // meglio usare il budget che prendere il capo più economico
       const prezzo = r > 1.15 ? -(r - 1.15) * 6 : r < 0.45 ? -(0.45 - r) * 4 : 0;
