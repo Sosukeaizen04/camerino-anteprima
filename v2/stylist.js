@@ -356,7 +356,7 @@ const RX_GILET = /gilet|\bvest\b|waistcoat|chaleco/i;
 const RX_SHORTS = /shorts?\b|bermuda|skort/i;
 export const SOTTOCATEGORIE = {
   sopra: [["camicie", "Camicie e bluse", c => c.c === "camicia" || /blouse|blusa|chemise|camicia/i.test(c.t) && !RX_TSHIRT.test(c.t)],
-    ["felpe", "Felpe e hoodie", c => RX_FELPA.test(c.t) || (/crewneck|crew neck/i.test(c.t) && c.c !== "maglia" && !RX_MAGLIA_NOME.test(c.t))],
+    ["felpe", "Felpe e hoodie", c => RX_FELPA.test(c.t) || (/crewneck|crew neck/i.test(c.t) && c.c !== "maglia" && !RX_MAGLIA_NOME.test(c.t) && !RX_TSHIRT.test(c.t))],
     ["tshirt", "T-shirt e polo", c => RX_TSHIRT.test(c.t)],
     ["maglie", "Maglioni e maglie", c => c.c === "maglia"],
     ["canotte", "Canotte e corsetti", c => RX_CANOTTA.test(c.t)],
