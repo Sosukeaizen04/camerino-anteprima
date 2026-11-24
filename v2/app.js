@@ -1,5 +1,6 @@
 // Camerino v2 — schermate. Le regole dell'outfit stanno in stylist.js.
 import * as S from "./stylist.js";
+import * as R from "./richiesta.js";
 import { LINGUA, cambiaLingua, tr } from "./lingua.js";
 import { isole } from "./isole.js";
 
@@ -959,20 +960,32 @@ function capisci(testo) {
   return q;
 }
 const REPARTI = [["capospalla", "Giacche e cappotti"], ["sopra", "Sopra"], ["sotto", "Sotto"], ["abito", "Abiti", "d"], ["scarpe", "Scarpe"]];
-let reparto = "sopra", listaScopri = [], mostratiScopri = 0, soloTaglia = true;
+let reparto = "sopra", sottoScopri = "", listaScopri = [], mostratiScopri = 0, soloTaglia = true;
 const filtriScopri = nuoviFiltri();
 /** I capi del reparto senza i filtri (per contarli nel pannello). Con una ricerca scritta: i risultati della ricerca. */
 function baseScopri() {
   const testo = $("c-q").value.trim();
   if (testo) return ricercaScopri;
   const vaBene = c => !esclusi.has(S.chiave(c)) && !(profilo.genere === "u" && (c.c === "abito" || c.c === "gonna"));
-  return soloTaglia ? S.alternative(DATI.capi, ctx(), outfit, reparto, Infinity) : DATI.capi.filter(c => S.postoDi(c) === reparto && vaBene(c));
+  const base = soloTaglia ? S.alternative(DATI.capi, ctx(), outfit, reparto, Infinity) : DATI.capi.filter(c => S.postoDi(c) === reparto && vaBene(c));
+  return sottoScopri ? base.filter(c => S.sottoDi(c, reparto) === sottoScopri) : base;
+}
+/** La riga delle sottocategorie del reparto, con quanti capi (solo quelle che ne hanno). */
+function htmlSotto() {
+  const l = S.SOTTOCATEGORIE[reparto]; if (!l) return "";
+  const prima = sottoScopri; sottoScopri = "";
+  const base = baseScopri(); sottoScopri = prima;
+  const n = {}; for (const c of base) { const k = S.sottoDi(c, reparto); n[k] = (n[k] || 0) + 1; }
+  const voci = l.filter(([k]) => n[k]);
+  if (voci.length < 2) return "";
+  return `<div class="sotto-cat" role="group" aria-label="Tipo">${[["", "Tutto", base.length], ...voci.map(([k, nome]) => [k, nome, n[k]])]
+    .map(([k, nome, q]) => `<button class="piccolo" data-s="${k}" aria-pressed="${k === sottoScopri}"><span>${nome}</span> <small>${q.toLocaleString("it")}</small></button>`).join("")}</div>`;
 }
 let ricercaScopri = [];
 function scopri() {
   const reparti = REPARTI.filter(r => !r[2] || r[2] === profilo.genere), testo = $("c-q").value.trim();
   $("c-filtri").innerHTML = (testo ? "" : reparti.map(r => `<button class="piccolo" data-r="${r[0]}" aria-pressed="${r[0] === reparto}">${r[1]}</button>`).join("")) +
-    `<button class="piccolo" data-t="1" aria-pressed="${soloTaglia}">La mia taglia</button>` + htmlFiltri(filtriScopri, testo ? "abito" : reparto);
+    `<button class="piccolo" data-t="1" aria-pressed="${soloTaglia}">La mia taglia</button>` + (testo ? "" : htmlSotto()) + htmlFiltri(filtriScopri, testo ? "abito" : reparto);
   const vaBene = c => !esclusi.has(S.chiave(c)) && (!soloTaglia || S.haTaglia(c, profilo)) && !(profilo.genere === "u" && (c.c === "abito" || c.c === "gonna"));
   if (testo) {
     const q = capisci(testo), ql = q.hex ? S.lab(q.hex) : null;
@@ -1000,7 +1013,9 @@ $("c-q").addEventListener("search", () => { if (!$("c-q").value) scopri(); });
 $("c-filtri").onclick = e => {
   if (clicFiltri(e, filtriScopri, $("c-q").value.trim() ? "abito" : reparto, baseScopri, scopri)) return;
   const b = e.target.closest("button"); if (!b) return;
-  if (b.dataset.r) { reparto = b.dataset.r; adattaFiltri(filtriScopri, reparto); } else if (b.dataset.t) soloTaglia = !soloTaglia; else return;
+  if (b.dataset.r) { if (reparto !== b.dataset.r) sottoScopri = ""; reparto = b.dataset.r; adattaFiltri(filtriScopri, reparto); }
+  else if (b.dataset.s != null) sottoScopri = b.dataset.s === sottoScopri ? "" : b.dataset.s;
+  else if (b.dataset.t) soloTaglia = !soloTaglia; else return;
   scopri();
 };
 $("c-griglia").onclick = e => { if (e.target.closest(".altri")) return altriScopri(); const b = e.target.closest(".carta"); if (b) apriScheda(INDICE.get(b.dataset.k)); };
@@ -1143,66 +1158,13 @@ function apriAvatar() {
 // ======================================================================
 const chat = [];                 // [{ chi: "io"|"stylist", testo, capi? }]
 let ultimaRichiesta = null, pensando = false;
-const RX_SCARPE = { stivali: /boot|botte|bottine|stival/i, sneakers: /sneaker|trainer|basket/i, tacchi: /heel|pump|escarpin|d[ée]collet|tacc/i,
-  sandali: /sandal/i, mocassini: /loafer|mocassin|moccasin/i, ballerine: /ballet|ballerin|\bflats?\b/i };
-const RX_GIACCA = { cappotto: /coat|manteau|cappott|abrigo/i, giacca: /jacket|veste|giacc|chaqueta/i, blazer: /blazer/i, piumino: /puffer|padded|down\b|piumin|doudoune/i, trench: /trench/i };
-/** Il capo rispetta quello che lo stylist ha capito per il suo posto? */
-function vaPerRichiesta(c, r) {
-  const p = S.postoDi(c);
-  const pz = p === "abito" ? r.abito_dettagli : p === "capospalla" ? r.giacca_dettagli : r[p];
-  if (r.abito === true && (p === "sopra" || p === "sotto")) return false;
-  if (r.abito === false && p === "abito") return false;
-  if (r.stili?.length && p !== "scarpe" && !r.stili.includes(DATI.negozi[c.n].stile)) return false;   // lo stile chiesto conta davvero (se manca, il posto si allarga)
-  if (r.elegante && S.registro(c) < 2) return false;                      // per una cena: niente casual né sportivo, scarpe comprese
-  if (r.elegante && p !== "scarpe" && /\b(t-?shirt|t shirt|tee|hoodie|sweatshirt|sudadera|jogger|sweat ?pants?|track|legging|cargo|active|zip-?up|fleece|windbreaker|anorak|puffer|bomber|sport|felpa|chándal|sudadera|basico tinto)/i.test(c.t)) return false;
-  if (!pz) return true;
-  if (pz.tipo) {
-    if (p === "scarpe" && !RX_SCARPE[pz.tipo]?.test(c.t)) return false;
-    if (p === "capospalla" && !RX_GIACCA[pz.tipo]?.test(c.t)) return false;
-    if ((p === "sopra" || p === "sotto") && c.c !== pz.tipo) return false;
-  }
-  if (pz.colori?.length && !pz.colori.some(n => { const x = COLORI_FILTRO.find(y => y[0] === n); return x && vicinoA(c, x[1]); })) return false;
-  if (pz.materiale && c.f !== pz.materiale) return false;
-  if (pz.lunghezza && !passaFiltri(c, { l: pz.lunghezza })) return false;
-  if (pz.maniche && c.w !== pz.maniche) return false;
-  return true;
-}
-/** Compone il look della richiesta. Un posto senza capi adatti nella taglia si allarga subito (prima di dividere il budget). */
-function lookPerRichiesta(r) {
-  const pezzo = x => x && (x.tipo || x.colori?.length || x.materiale || x.maniche || x.lunghezza);
-  if (r.abito == null && (pezzo(r.sopra) || pezzo(r.sotto))) r = { ...r, abito: false };   // ha chiesto un sopra o un sotto: niente abito al loro posto
-  if (r.abito == null && pezzo(r.abito_dettagli)) r = { ...r, abito: true };
-  const tmp = { ...profilo, budget: r.budget || profilo.budget, stili: r.stili?.length ? r.stili : profilo.stili, conCapospalla: r.giacca ?? profilo.conCapospalla };
-  const c2 = { profilo: tmp, negozi: DATI.negozi, esclusi, elegante: !!r.elegante };
-  const larghi = { abito: r.abito, elegante: r.elegante };     // allargando si lasciano cadere stile e dettagli, non l'occasione
-  const usabile = c => !esclusi.has(S.chiave(c)) && S.haTaglia(c, tmp) && !S.fuoriStagione(c, tmp.freddo);
-  // per ogni posto si allarga per gradi finché ci sono almeno 3 capi nella taglia e nel budget: tutto → senza stile → solo il tipo di capo → solo l'occasione
-  const soloTipo = x => x && { tipo: x.tipo };
-  const gradi = [r, { ...r, stili: [] }, { ...r, stili: [], sopra: soloTipo(r.sopra), sotto: soloTipo(r.sotto), scarpe: soloTipo(r.scarpe), giacca_dettagli: soloTipo(r.giacca_dettagli), abito_dettagli: null }, larghi];
-  const capi = [], allargati = [];
-  for (const p of ["capospalla", "sopra", "sotto", "scarpe", "abito"]) {
-    if ((r.abito === true && (p === "sopra" || p === "sotto")) || (r.abito === false && p === "abito")) continue;
-    const delPosto = DATI.capi.filter(c => S.postoDi(c) === p);
-    let g = 0, lista = [];
-    for (; g < gradi.length; g++) { lista = delPosto.filter(c => vaPerRichiesta(c, gradi[g])); if (lista.filter(c => usabile(c) && c.e <= tmp.budget * 0.5).length >= 3) break; }
-    capi.push(...lista);
-    if (g > 0 && (p !== "abito" || r.abito) && (p !== "capospalla" || tmp.conCapospalla) && (p === "capospalla" ? r.giacca_dettagli : p === "abito" ? r.abito_dettagli : r[p])) allargati.push(p);
-  }
-  let o = S.componi(capi, c2, S.outfitVuoto(), new Set(), S.casuale(++seme));
-  if (S.mancanti(o.outfit).length) {        // il budget non bastava coi capi richiesti: si completa coi più vicini
-    const tutti = DATI.capi.filter(c => vaPerRichiesta(c, larghi));
-    const posti = new Set(["capospalla", "sopra", "sotto", "scarpe", "abito"].filter(p => o.outfit[p]));
-    const tenuti = S.componi(tutti, c2, o.outfit, posti, S.casuale(++seme));
-    o = !S.mancanti(tenuti.outfit).length ? tenuti : S.componi([...capi, ...tutti], c2, S.outfitVuoto(), new Set(), S.casuale(++seme));   // se no si riparte da capo
-    for (const p of S.POSTI) if (o.outfit[p] && !vaPerRichiesta(o.outfit[p], r) && !allargati.includes(p)) allargati.push(p);
-  }
-  return { ...o, budget: tmp.budget, allargati: allargati.filter(p => o.outfit[p]) };
-}
+// le regole sono in richiesta.js (provate con node: v2/richiesta.test.js)
+const lookPerRichiesta = r => R.lookPerRichiesta(r, { profilo, negozi: DATI.negozi, capi: DATI.capi, esclusi, rnd: S.casuale(++seme) });
 function apriStylist() {
   const corpo = apriFoglio("Stylist", "");
   const disegnaChat = () => {
     const esempi = profilo.genere === "u" ? ["Un look da ufficio sotto 300 €", "Qualcosa per una cena, scarpe nere", "Weekend in montagna"] : ["Un look da ufficio sotto 300 €", "Una cena elegante, stivali neri", "Jeans e maglione di lana per il weekend"];
-    corpo.innerHTML = `<div class="chat" id="chat">${chat.length ? chat.map((m, i) => `<div class="msg ${m.chi}"${m.chi === "io" ? ' translate="no"' : ""}><p>${esc(m.testo)}</p>${m.capi ? `<div class="strip">${m.capi.map(k => INDICE.get(k)).filter(Boolean).map(c => `<img src="${foto(c, 120)}" alt="${esc(c.t)}">`).join("")}</div><button class="piccolo" data-rimetti="${i}">Indossa questo look</button>` : ""}</div>`).join("")
+    corpo.innerHTML = `<div class="chat" id="chat">${chat.length ? chat.map((m, i) => `<div class="msg ${m.chi}"><p translate="no">${esc(m.testo)}</p>${m.capi ? `<div class="strip">${m.capi.map(k => INDICE.get(k)).filter(Boolean).map(c => `<button class="mini" data-capo="${esc(S.chiave(c))}" aria-label="${esc(c.t)}"><img src="${foto(c, 160)}" alt=""><span>${euro(c.e)}</span></button>`).join("")}</div><button class="piccolo" data-rimetti="${i}">Indossa questo look</button>` : ""}</div>`).join("")
       : `<p class="sotto" style="margin:0 0 10px">Scrivi cosa cerchi: l'occasione, i colori, un capo, il budget. Compongo il look con capi veri, nella tua taglia.</p><div class="esempi">${esempi.map(x => `<button class="piccolo" data-esempio>${esc(x)}</button>`).join("")}</div>`}
       ${pensando ? `<div class="msg stylist"><p class="attesa-testo">Sto pensando…</p></div>` : ""}</div>
       <form class="cerca chat-form" id="chat-form"><input id="chat-q" autocomplete="off" placeholder="Scrivi qui…" aria-label="Scrivi allo stylist" ${pensando ? "disabled" : ""}><button aria-label="Invia" ${pensando ? "disabled" : ""}>→</button></form>`;
@@ -1219,14 +1181,22 @@ function apriStylist() {
       if (!r.ok || !d.richiesta) throw new Error(d.messaggio || "Non ci sono riuscito. Riprova.");
       ultimaRichiesta = d.richiesta;
       const l = lookPerRichiesta(d.richiesta), capi = S.capiDi(l.outfit);
-      let testoR = d.risposta || "Ecco il look.";
-      if (!capi.length) testoR += " " + tr("Però con queste richieste non trovo capi nella tua taglia. Prova ad allargare un po'.");
+      // si risponde nella lingua in cui si è scritto, anche se l'app è in un'altra (Andrea 24/11: risposta metà italiano e metà inglese)
+      const en = d.lingua ? d.lingua !== "it" : LINGUA === "en";
+      const T = (it, eng) => en ? eng : it;
+      let testoR = d.risposta || T("Ecco il look.", "Here's the look.");
+      if (!capi.length) testoR += " " + T("Però con queste richieste non trovo capi nella tua taglia. Prova ad allargare un po'.", "But I can't find pieces in your size for this. Try asking for something a bit broader.");
       else {
-        if (l.budget !== profilo.budget) { profilo.budget = l.budget; }
-        const prima = outfit; outfit = l.outfit; manca = l.manca; bloccati.clear(); ricorda(); disegna();
-        const en = LINGUA === "en", nomi = l.allargati.map(p => tr(S.NOME_POSTO[p]).toLowerCase()).join(en ? " and " : " e ");
-        testoR += en ? ` (${capi.length} items, ${euro(S.totale(outfit))})` : ` (${capi.length} capi, ${euro(S.totale(outfit))})`;
-        if (l.allargati.length) testoR += " " + (en ? `For the ${nomi} there wasn't exactly what you asked for: I picked the closest.` : `Per ${nomi} non c'era esattamente quello che chiedi: ho messo il più vicino.`);
+        // il budget detto in chat vale per questo look: il profilo non si tocca
+        const prima = outfit; outfit = l.outfit; manca = []; bloccati.clear(); ricorda(); disegna();
+        const nomi = l.allargati.map(p => (en ? { capospalla: "jacket", sopra: "top", sotto: "bottom", scarpe: "shoes", abito: "dress" }[p] : S.NOME_POSTO[p].toLowerCase())).join(T(" e ", " and "));
+        const tot = euro(S.totale(outfit));
+        testoR += " " + (l.sforato ? T(`Totale ${tot}: un po' sopra i ${euro(l.budget)} ${d.richiesta.budget ? "che hai detto" : "del tuo profilo"}, perché i capi che hai chiesto non stavano tutti dentro.`, `Total ${tot}: a bit over the ${euro(l.budget)} ${d.richiesta.budget ? "you asked for" : "in your profile"}, because the pieces you asked for didn't all fit.`)
+          : d.richiesta.budget ? T(`Totale ${tot}, dentro i ${euro(l.budget)} che hai detto.`, `Total ${tot}, within the ${euro(l.budget)} you asked for.`)
+          : T(`Totale ${tot} (il tetto è il budget del tuo profilo, ${euro(l.budget)}: scrivi per esempio "sotto 150 €" per cambiarlo).`, `Total ${tot} (the limit is your profile budget, ${euro(l.budget)}: write e.g. "under 150 €" to change it).`));
+        if (l.allargati.length) testoR += " " + T(`Per ${nomi} non c'era quello che chiedi nella tua taglia: ho messo il più vicino.`, `For the ${nomi} there wasn't what you asked for in your size: I picked the closest.`);
+        if (l.diverso.length) testoR += " " + T(`${l.diverso.map(p => S.NOME_POSTO[p]).join(", ")}: del tipo che chiedi, ma non nel colore o materiale esatto.`, `${l.diverso.map(p => ({ capospalla: "Jacket", sopra: "Top", sotto: "Bottom", scarpe: "Shoes", abito: "Dress" }[p])).join(", ")}: the type you asked for, but not the exact colour or material.`);
+        testoR += " " + T("Tocca un capo per vederlo.", "Tap a piece to see it.");
         chat.push({ chi: "stylist", testo: testoR, capi: capi.map(S.chiave) });
         pensando = false; disegnaChat();
         return;
@@ -1238,6 +1208,7 @@ function apriStylist() {
   disegnaChat();
   corpo.onclick = e => {
     const es = e.target.closest("[data-esempio]"); if (es) return manda(es.textContent);
+    const mi = e.target.closest("[data-capo]"); if (mi) { const c = INDICE.get(mi.dataset.capo); if (c) apriScheda(c, 2, true); return; }
     const ri = e.target.closest("[data-rimetti]");
     if (ri) {
       outfit = S.outfitVuoto();

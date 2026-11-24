@@ -200,6 +200,8 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 .zoom-vista button { position: absolute; top: max(12px, env(safe-area-inset-top, 0px)); right: 12px; background: var(--carta); }
 .zoom-vista small { position: absolute; bottom: max(14px, env(safe-area-inset-bottom, 0px)); left: 0; right: 0; text-align: center; color: var(--ink-3); font-size: 12px; }
 .filtri-capo, #c-filtri { flex-wrap: wrap; overflow: visible; }
+.sotto-cat { flex-basis: 100%; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
+.sotto-cat button { flex: none; } .sotto-cat small { opacity: .55; margin-left: 2px; }
 /* --- 19/11: filtri come Zalando (scelta multipla, pannello con conteggi), zoom con due dita --- */
 .riga-filtri { flex-basis: 100%; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
 .riga-filtri::-webkit-scrollbar { display: none; }
@@ -259,7 +261,9 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 .chat .msg p { margin: 0; padding: 9px 12px; font-size: 14px; line-height: 1.45; }
 .chat .msg.io { justify-self: end; } .chat .msg.io p { background: var(--ink); color: var(--carta); }
 .chat .msg.stylist p { background: var(--velo); border: 1px solid var(--riga); }
-.chat .msg .strip { display: flex; gap: 4px; margin: 6px 0; } .chat .msg .strip img { width: 54px; height: 72px; object-fit: cover; border: 1px solid var(--riga); }
+.chat .msg .strip { display: flex; gap: 6px; margin: 6px 0; flex-wrap: wrap; }
+.chat .msg .strip .mini { display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 0; border: 0; background: none; cursor: pointer; font: inherit; font-size: 11px; color: inherit; }
+.chat .msg .strip img { width: 64px; height: 86px; object-fit: cover; object-position: center top; border: 1px solid var(--riga); }
 .chat .esempi { display: flex; flex-wrap: wrap; gap: 6px; }
 .chat .attesa-testo { color: var(--ink-3); }
 .chat-form { position: sticky; bottom: 0; background: var(--carta); padding: 10px 0 max(10px, env(safe-area-inset-bottom, 0px)); margin: 0; }

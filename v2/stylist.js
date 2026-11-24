@@ -344,3 +344,32 @@ export function numeroScarpa(etichetta, sistema, genere) {
   const eu = Math.floor((sis === "UK" ? n + (uomo ? 33.5 : 33) : n + (uomo ? 33 : 30.5)) + 0.5);
   return eu >= 35 && eu <= 47 ? eu : null;
 }
+
+// ---------- sottocategorie di Scopri (Andrea 24/11: "Top → felpe e hoodie, camicie e top…") ----------
+// dal tipo di capo del catalogo (c), dal tipo di scarpa (y) e dal nome; l'ordine conta: vince la prima che va bene
+const RX_FELPA = /hoodie|sweatshirt|sweat-shirt|\bsweat\b|felpa|sudadera|crewneck|zip-?up|half-?zip|quarter-?zip|fleece/i;
+const RX_TSHIRT = /t-?shirt|t shirt|\btee\b|tees\b|camiseta|\bpolo\b/i;
+const RX_CANOTTA = /tank|\bcami\b|camisole|canott|d[ée]bardeur|bralette|bustier|corset|tube top|bandeau/i;
+const RX_GILET = /gilet|\bvest\b|waistcoat|chaleco/i;
+const RX_SHORTS = /shorts?\b|bermuda|skort/i;
+export const SOTTOCATEGORIE = {
+  sopra: [["camicie", "Camicie e bluse", c => c.c === "camicia" || /blouse|blusa|chemise|camicia/i.test(c.t) && !RX_TSHIRT.test(c.t)],
+    ["felpe", "Felpe e hoodie", c => RX_FELPA.test(c.t)],
+    ["tshirt", "T-shirt e polo", c => RX_TSHIRT.test(c.t)],
+    ["maglie", "Maglioni e maglie", c => c.c === "maglia"],
+    ["canotte", "Canotte e corsetti", c => RX_CANOTTA.test(c.t)],
+    ["top", "Top", () => true]],
+  sotto: [["jeans", "Jeans", c => c.c === "jeans"], ["shorts", "Shorts", c => RX_SHORTS.test(c.t)], ["gonne", "Gonne", c => c.c === "gonna"], ["pantaloni", "Pantaloni", () => true]],
+  capospalla: [["blazer", "Blazer", c => /blazer/i.test(c.t)], ["gilet", "Gilet e smanicati", c => RX_GILET.test(c.t)], ["piumini", "Piumini", c => /puffer|padded|down jacket|piumin|doudoune/i.test(c.t)],
+    ["trench", "Trench", c => /trench/i.test(c.t)], ["cappotti", "Cappotti", c => /coat|manteau|cappott|abrigo|parka/i.test(c.t)],
+    ["giacche", "Giacche", () => true]],
+  abito: [["mini", "Corti", c => c.l === "corta" || /\bmini\b/i.test(c.t)], ["lunghi", "Lunghi", c => c.l === "lunga" || /maxi|long dress|\blong\b/i.test(c.t)], ["altri", "Altri abiti", () => true]],
+  scarpe: [["decollete", "Décolleté", c => c.y === "décolleté"], ["stivali", "Stivali", c => c.y === "stivali"], ["stivaletti", "Stivaletti", c => c.y === "stivaletti"],
+    ["sneakers", "Sneakers", c => c.y === "sneakers"], ["mocassini", "Mocassini", c => c.y === "mocassini"], ["ballerine", "Ballerine", c => c.y === "ballerine"],
+    ["sandali", "Sandali e mules", c => c.y === "sandali" || c.y === "mules"], ["altre", "Altre", () => true]],
+};
+/** La sottocategoria di un capo nel suo reparto. */
+export function sottoDi(capo, posto = postoDi(capo)) {
+  const l = SOTTOCATEGORIE[posto]; if (!l) return null;
+  return (l.find(([, , f]) => f(capo)) || l[l.length - 1])[0];
+}
