@@ -24,7 +24,7 @@ const EN = {
   "Giacca": "Jacket", "Sopra": "Top", "Sotto": "Bottom", "Scarpe": "Shoes", "Abito": "Dress", "Abiti": "Dresses", "Giacche e cappotti": "Jackets and coats",
   "Maglie": "Knitwear", "Camicie": "Shirts", "Top e t-shirt": "Tops and t-shirts", "Pantaloni": "Trousers", "Jeans": "Jeans", "Gonne": "Skirts", "Tutti": "All", "Tutte": "All",
   "Tutto": "All", "Camicie e bluse": "Shirts and blouses", "Felpe e hoodie": "Sweatshirts and hoodies", "T-shirt e polo": "T-shirts and polos", "Maglioni e maglie": "Jumpers and knits",
-  "Canotte e corsetti": "Tank tops and corsets", "Top": "Tops", "Shorts": "Shorts", "Blazer": "Blazers", "Gilet e smanicati": "Vests and gilets", "Piumini": "Puffer jackets", "Trench": "Trench coats",
+  "Canotte e corsetti": "Tank tops and corsets", "Canotte": "Tank tops", "Top": "Tops", "Shorts": "Shorts", "Blazer": "Blazers", "Gilet e smanicati": "Vests and gilets", "Piumini": "Puffer jackets", "Trench": "Trench coats",
   "Cappotti": "Coats", "Giacche": "Jackets", "Corti": "Short", "Lunghi": "Long", "Altri abiti": "Other dresses", "Décolleté": "Pumps", "Stivali": "Boots", "Stivaletti": "Ankle boots",
   "Sneakers": "Sneakers", "Mocassini": "Loafers", "Ballerine": "Ballet flats", "Sandali e mules": "Sandals and mules", "Altre": "Other", "Tocca un capo per vederlo": "Tap a piece to see it",
   // profilo

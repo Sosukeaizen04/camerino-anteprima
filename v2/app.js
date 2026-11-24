@@ -978,7 +978,7 @@ function htmlSotto() {
   const n = {}; for (const c of base) { const k = S.sottoDi(c, reparto); n[k] = (n[k] || 0) + 1; }
   const voci = l.filter(([k]) => n[k]);
   if (voci.length < 2) return "";
-  return `<div class="sotto-cat" role="group" aria-label="Tipo">${[["", "Tutto", base.length], ...voci.map(([k, nome]) => [k, nome, n[k]])]
+  return `<div class="sotto-cat" role="group" aria-label="Tipo">${[["", "Tutto", base.length], ...voci.map(([k, nome]) => [k, profilo.genere === "u" && k === "canotte" ? "Canotte" : nome, n[k]])]
     .map(([k, nome, q]) => `<button class="piccolo" data-s="${k}" aria-pressed="${k === sottoScopri}"><span>${nome}</span> <small>${q.toLocaleString("it")}</small></button>`).join("")}</div>`;
 }
 let ricercaScopri = [];

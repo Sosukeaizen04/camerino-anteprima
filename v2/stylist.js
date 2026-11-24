@@ -347,14 +347,16 @@ export function numeroScarpa(etichetta, sistema, genere) {
 
 // ---------- sottocategorie di Scopri (Andrea 24/11: "Top → felpe e hoodie, camicie e top…") ----------
 // dal tipo di capo del catalogo (c), dal tipo di scarpa (y) e dal nome; l'ordine conta: vince la prima che va bene
-const RX_FELPA = /hoodie|sweatshirt|sweat-shirt|\bsweat\b|felpa|sudadera|crewneck|zip-?up|half-?zip|quarter-?zip|fleece/i;
+const RX_FELPA = /hoodie|hoody|sweatshirt|sweat-shirt|\bsweat\b|felpa|sudadera|zip-?up hood|fleece/i;
+// "crewneck" da solo è spesso un maglione (Soft Knit Boxy Crewneck Sweater): felpa solo se non è maglia
+const RX_MAGLIA_NOME = /sweater|knit|wool|cashmere|merino|alpaca|mohair|\bpull\b|jumper|maglion/i;
 const RX_TSHIRT = /t-?shirt|t shirt|\btee\b|tees\b|camiseta|\bpolo\b/i;
 const RX_CANOTTA = /tank|\bcami\b|camisole|canott|d[ée]bardeur|bralette|bustier|corset|tube top|bandeau/i;
 const RX_GILET = /gilet|\bvest\b|waistcoat|chaleco/i;
 const RX_SHORTS = /shorts?\b|bermuda|skort/i;
 export const SOTTOCATEGORIE = {
   sopra: [["camicie", "Camicie e bluse", c => c.c === "camicia" || /blouse|blusa|chemise|camicia/i.test(c.t) && !RX_TSHIRT.test(c.t)],
-    ["felpe", "Felpe e hoodie", c => RX_FELPA.test(c.t)],
+    ["felpe", "Felpe e hoodie", c => RX_FELPA.test(c.t) || (/crewneck|crew neck/i.test(c.t) && c.c !== "maglia" && !RX_MAGLIA_NOME.test(c.t))],
     ["tshirt", "T-shirt e polo", c => RX_TSHIRT.test(c.t)],
     ["maglie", "Maglioni e maglie", c => c.c === "maglia"],
     ["canotte", "Canotte e corsetti", c => RX_CANOTTA.test(c.t)],

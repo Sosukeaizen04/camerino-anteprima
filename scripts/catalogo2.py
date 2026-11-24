@@ -24,11 +24,13 @@ RX_UNISEX = re.compile(r"unisex|genderless|all gender")
 RX_SCARPE = re.compile(r"\b(shoes?|sneakers?|trainers?|boots?|booties?|bottes?|bottines?|sandals?|sandales?|sandal[io]|mules?|loafers?|"
                        r"heels?|pumps?|ballet flats?|ballerin[ae]s?|chaussures?|scarp[ae]|stival[ei]|stivalett[io]|mocassin[io]?|"
                        r"derby|derbies|espadrill\w*|clogs?|slingbacks?|flats|baskets|zapat\w+|botas?)\b")
+# capi da bambini venduti come "Girls …" da negozi per adulti (Andrea 24/11: top da bambina nel look)
+RX_BAMBINI = re.compile(r"^\s*(?:girls?|kids?|toddlers?)\b", re.I)   # "Boy Henley" è un modello da donna: boy non conta
 # tutto ciò che resta fuori (accessori, intimo, casa…): le parole delle scarpe sono tolte dalla lista di catalogo.py
 RX_FUORI = re.compile(r"\b(bag|bags|borsa|sac|bolso|tote|clutch|pouch|belt|ceinture|cintura|earring|necklace|bracelet|ring|jewel|bijou|"
                       r"scarf|sciarpa|foulard|echarpe|hat|cap|beanie|bonnet|sock|socks|chaussette|calz|gift|card|candle|sunglass|lunette|"
                       r"keyring|charm|hair|swim|bikini|maillot|underwear|lingerie|bra\b|brief|culotte|perfume|parfum|towel|mask|glove|gant|"
-                      r"blanket|leg ?warmers?|arm ?warmers?|scaldamuscoli|gaiters?|snood|scaldacollo|neck ?warmer|\bcombs?\b|hairbrush|spazzola|skullcap|balaclava|patron de couture|sewing pattern|knitting pattern|crochet pattern|\bclasp\b|\bpdf\b|cartamodell|guantes?|gloves?|mittens?|keychain|key ?ring|headband|head ?scarf|bandana|beret|scrunchie|hair ?clip|bucket hat|llavero|\bthrow\b|kids?\b|baby|bebe|enfant|toddler|infant|pj\b|pyjama|pajama|sleep|robe de chambre|gift card|final sale item|laces?|insoles?|shoe care)")
+                      r"blanket|leg ?warmers?|arm ?warmers?|scaldamuscoli|gaiters?|snood|scaldacollo|neck ?warmer|\bcombs?\b|hairbrush|spazzola|skullcap|balaclava|patron de couture|sewing pattern|knitting pattern|crochet pattern|\bclasp\b|\bpdf\b|cartamodell|guantes?|gloves?|mittens?|keychain|key ?ring|headband|head ?scarf|bandana|beret|scrunchie|hair ?clip|bucket hat|llavero|\bthrow\b|kids?\b|baby|bebe|enfant|toddler|infant|pj\b|pyjama|pajama|sleep|robe de chambre|little (?:girls?|boys?)|big girls?|mini ?me\b|mommy and me|pant(?:y|ies)\b|knickers|boxers?\b|boxer shorts?|gift card|final sale item|laces?|insoles?|shoe care)")
 
 NUMERI_SCARPE = list(range(35, 48))  # taglie europee 35–47
 
@@ -75,7 +77,10 @@ def categoria(p):
     """Posto del capo: le categorie di catalogo.py più 'scarpe'. Vale il titolo, poi il tipo prodotto.
     I tag non si usano: sono rumorosi e mettevano felpe tra i pantaloni."""
     titolo, tipo = p["title"].lower(), p["product_type"].lower()
-    if RX_FUORI.search(f"{tipo} {titolo}"):
+    if RX_FUORI.search(f"{tipo} {titolo}") or RX_BAMBINI.search(titolo) or RX_BAMBINI.search(tipo):
+        return None
+    # "thong" è intimo, ma anche il sandalo infradito (Staud, St. Agni, Aje): fuori solo se non è una scarpa
+    if re.search(r"\bthong\b", titolo) and not (RX_SCARPE.search(tipo) or re.search(r"wedge|sandal|heel|platform|flip", titolo)):
         return None
     if RX_SCARPE.search(titolo) or RX_SCARPE.search(tipo):
         return "scarpe"
