@@ -10,9 +10,9 @@ const D = JSON.parse(readFileSync(new URL(process.env.CATALOGO || "../data/v2-do
 const prof = { genere: "d", tagliaSopra: "M", tagliaSotto: "M", scarpa: 38, stagione: "autunno", budget: 300, stili: [], conCapospalla: true, freddo: true };
 const pz = (tipo, x = {}) => ({ tipo, colori: [], materiale: null, ...x });
 const CASI = [
-  ["camicia elegante, pantalone marrone, scarpa col tacco", { budget: null, stili: ["Italiano", "Sera"], elegante: true, abito: null, sopra: pz("camicia"), sotto: pz("pantaloni", { colori: ["marrone"] }), scarpe: pz("tacchi") }],
-  ["camicia maniche lunghe elegante, pantalone marrone, tacco", { budget: null, stili: ["Italiano", "Sera"], elegante: true, abito: null, sopra: pz("camicia", { maniche: "lunghe" }), sotto: pz("pantaloni", { colori: ["marrone"] }), scarpe: pz("tacchi") }],
-  ["ufficio: camicia, pantalone, scarpa", { budget: null, stili: ["Minimal", "Italiano"], elegante: true, abito: null, sopra: pz("camicia"), sotto: pz("pantaloni"), scarpe: pz(null) }],
+  ["camicia elegante, pantalone marrone, scarpa col tacco", { budget: null, stili: ["Classico", "Sera"], elegante: true, abito: null, sopra: pz("camicia"), sotto: pz("pantaloni", { colori: ["marrone"] }), scarpe: pz("tacchi") }],
+  ["camicia maniche lunghe elegante, pantalone marrone, tacco", { budget: null, stili: ["Classico", "Sera"], elegante: true, abito: null, sopra: pz("camicia", { maniche: "lunghe" }), sotto: pz("pantaloni", { colori: ["marrone"] }), scarpe: pz("tacchi") }],
+  ["ufficio: camicia, pantalone, scarpa", { budget: null, stili: ["Minimal", "Classico"], elegante: true, abito: null, sopra: pz("camicia"), sotto: pz("pantaloni"), scarpe: pz(null) }],
   ["camicia sotto 150 €", { budget: 150, stili: [], elegante: false, abito: null, sopra: pz("camicia"), sotto: null, scarpe: null }],
 ];
 for (const [nome, r] of CASI) test(nome, () => {

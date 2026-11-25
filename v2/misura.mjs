@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import * as S from "./stylist.js";
 const D = JSON.parse(readFileSync(new URL("../data/v2-donna.json", import.meta.url)));
 const casi = [
-  { nome: "Lusso+Italiano, inverno, 400 €", p: { genere: "d", tagliaSopra: "M", tagliaSotto: "M", scarpa: 38, stagione: "inverno", budget: 400, stili: ["Lusso", "Italiano"], conCapospalla: true, freddo: true } },
+  { nome: "Lusso+Italiano, inverno, 400 €", p: { genere: "d", tagliaSopra: "M", tagliaSotto: "M", scarpa: 38, stagione: "inverno", budget: 400, stili: ["Lusso", "Classico"], conCapospalla: true, freddo: true } },
   { nome: "Minimal, autunno, 300 €", p: { genere: "d", tagliaSopra: "S", tagliaSotto: "S", scarpa: 37, stagione: "autunno", budget: 300, stili: ["Minimal"], conCapospalla: true, freddo: true } },
   { nome: "senza stile, primavera, 500 €", p: { genere: "d", tagliaSopra: "L", tagliaSotto: "L", scarpa: 39, stagione: "primavera", budget: 500, stili: [], conCapospalla: true, freddo: true } },
 ];

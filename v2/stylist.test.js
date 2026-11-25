@@ -116,7 +116,7 @@ test("senza capospalla ma d'inverno: comunque niente shorts né sandali", () => 
 });
 
 // ---- Andrea 20/11: "lusso italiano" non deve dare capi hip hop o sportivi; palette rispettata; "Nuovo look" non sempre abito
-const lusso = { ...donna, stagione: "inverno", budget: 400, stili: ["Lusso", "Italiano"], freddo: true };
+const lusso = { ...donna, stagione: "inverno", budget: 400, stili: ["Lusso", "Classico"], freddo: true };
 test("stile Lusso+Italiano: niente capi sportivi, quasi niente casual, quasi sempre nel suo stile", () => {
   let capi = 0, casual = 0, fuori = 0;
   for (let s = 1; s <= 100; s++) {
@@ -166,7 +166,7 @@ test("catalogo: magliette, gonne in maglia e abiti-camicia al posto giusto", () 
 // giro 4: un solo protagonista per look (una fantasia, niente doppio denim, niente sneakers con stili curati)
 test("coerenza: fantasie, denim e sneakers su 100 look per stile", () => {
   const fant = c => !!c.q, denim = c => c.c === "jeans" || c.f === "denim" || /\bdenim\b|\bjean\b/i.test(c.t);
-  for (const st of ["Parigino", "Minimal", "Italiano"]) {
+  for (const st of ["Chic", "Minimal", "Classico"]) {
     const p = { genere: "d", tagliaSopra: "M", tagliaSotto: "M", scarpa: 38, stagione: null, budget: 400, stili: [st], conCapospalla: true, freddo: true };
     let dueFant = 0, dueDenim = 0, sneak = 0;
     for (let s = 1; s <= 100; s++) {
@@ -180,7 +180,7 @@ test("coerenza: fantasie, denim e sneakers su 100 look per stile", () => {
 // giro 6: negli stili curati capi "base" (niente loghi, scritte, calzini, infradito, rafia, tie dye)
 test("stili curati: niente loghi, calzini, infradito, rafia su 100 look", () => {
   const rx = /\blogo|graphic|slogan|\bsocks?\b|\bthong|infradito|raffia|rafia|espadrill|tie[- ]?dye/i;
-  for (const st of ["Minimal", "Lusso", "Parigino", "Italiano"]) {
+  for (const st of ["Minimal", "Lusso", "Chic", "Classico"]) {
     const p = { genere: "d", tagliaSopra: "M", tagliaSotto: "M", scarpa: 38, stagione: null, budget: 400, stili: [st], conCapospalla: true, freddo: true };
     for (let s = 1; s <= 100; s++) for (const c of S.capiDi(S.componi(DONNA.capi, { profilo: p, negozi: DONNA.negozi }, S.outfitVuoto(), new Set(), S.casuale(1e6 + s * 7919)).outfit))
       assert.ok(!rx.test(c.t), `${st}: "${c.t}"`);

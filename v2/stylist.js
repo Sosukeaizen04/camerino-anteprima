@@ -82,31 +82,80 @@ export function tipoColore(capo) {
 }
 
 // ---------- stile ----------
+// Lo stile è del CAPO, non del negozio (Emanuele 25/11: "la categoria stile è troppo corta e poco coerente"):
+// lo stile del negozio fa da punto di partenza, poi contano nome, fantasia, colore, materiale ed eleganza del capo.
 export const AFFINI = {
-  Minimal: ["Parigino", "Lusso", "Denim", "Maglieria", "Italiano", "Sostenibile"],
-  Parigino: ["Minimal", "Romantico", "Denim", "Maglieria", "Italiano", "Lusso"],
-  Lusso: ["Minimal", "Parigino", "Italiano", "Maglieria", "Sera"],
-  Romantico: ["Parigino", "Boho", "Colore"],
-  Boho: ["Romantico", "Colore", "Denim"],
-  Colore: ["Romantico", "Boho", "Parigino", "Denim"],
-  Italiano: ["Minimal", "Parigino", "Lusso", "Maglieria"],
-  Maglieria: ["Minimal", "Parigino", "Italiano", "Denim", "Sostenibile", "Lusso"],
-  Sostenibile: ["Minimal", "Denim", "Maglieria", "Sportivo", "Streetwear"],
-  Denim: ["Minimal", "Parigino", "Streetwear", "Sostenibile", "Maglieria", "Boho", "Colore", "Curvy", "Rock"],
-  Curvy: ["Denim", "Minimal", "Sera"],
-  Sportivo: ["Streetwear", "Sostenibile", "Denim"],
-  Streetwear: ["Sportivo", "Denim", "Sostenibile", "Rock"],
-  Sera: ["Lusso", "Curvy", "Rock"],
-  Rock: ["Streetwear", "Denim", "Sera"],
+  Minimal: ["Classico", "Chic", "Casual", "Lusso", "Ufficio"],
+  Classico: ["Minimal", "Ufficio", "Chic", "Preppy", "Lusso", "Elegante"],
+  Chic: ["Minimal", "Classico", "Romantico", "Preppy"],
+  Ufficio: ["Classico", "Minimal", "Elegante", "Chic"],
+  Elegante: ["Sera", "Lusso", "Classico", "Ufficio"],
+  Lusso: ["Elegante", "Classico", "Minimal", "Sera"],
+  Sera: ["Elegante", "Lusso", "Rock"],
+  Romantico: ["Chic", "Boho", "Vintage"],
+  Boho: ["Romantico", "Vintage", "Mare", "Casual"],
+  Vintage: ["Boho", "Romantico", "Rock", "Preppy"],
+  Preppy: ["Classico", "Chic", "Casual"],
+  Casual: ["Minimal", "Streetwear", "Sportivo", "Preppy", "Boho"],
+  Mare: ["Boho", "Casual", "Romantico", "Colorato"],
+  Colorato: ["Boho", "Mare", "Romantico"],
+  Sportivo: ["Streetwear", "Casual"],
+  Streetwear: ["Sportivo", "Casual", "Rock"],
+  Rock: ["Streetwear", "Vintage", "Sera"],
 };
 export const STILI = Object.keys(AFFINI);
+// i nomi vecchi (profili salvati, chat) → i nuovi
+export const STILE_VECCHIO = { Parigino: "Chic", Italiano: "Classico", Maglieria: "Casual", Denim: "Casual", Colore: "Colorato", Sostenibile: null, Curvy: null };
+export const stiliNuovi = l => [...new Set((l || []).map(x => x in STILE_VECCHIO ? STILE_VECCHIO[x] : x).filter(x => x && AFFINI[x]))];
+const DAL_NEGOZIO = { Minimal: "Minimal", Parigino: "Chic", Lusso: "Lusso", Romantico: "Romantico", Boho: "Boho", Colore: "Colorato", Italiano: "Classico",
+  Maglieria: "Casual", Sostenibile: "Casual", Denim: "Casual", Curvy: null, Sportivo: "Sportivo", Streetwear: "Streetwear", Sera: "Sera", Rock: "Rock" };
+const REGOLE_STILE = [
+  ["Sera", /sequin|paillett|satin|\bslip dress|velvet|velluto|corset|lurex|metallic|party|cocktail|\bgown|feather|piume|strass|rhinestone|glitter/i],
+  ["Romantico", /ruffle|frill|\blace\b|pizzo|dentelle|\bbow\b|fiocco|floral|puff sleeve|smock|broderie|volant|eyelet|pointelle|tulle/i],
+  ["Boho", /crochet|uncinetto|fringe|frange|paisley|embroider|ricamat|peasant|tiered|kaftan|caftan|patchwork|macram/i],
+  ["Chic", /stripe|righe|breton|marini[eè]re|\btrench|ballet|ballerin|mary ?jane|beret|kitten heel|\bcardigan\b/i],
+  ["Classico", /blazer|tailor|sartorial|pleated (trouser|pant)|cigarette|\bchino|cashmere|camel|wool coat|cappotto|loafer|mocassin|oxford|button[- ]down|gabardin/i],
+  ["Ufficio", /blazer|tailor|suit\b|trouser|pantalone|pencil skirt|\bshirt\b|camicia|blouse|loafer|pump|d[ée]collet|oxford|vest(?! top)|gilet/i],
+  ["Preppy", /\bpolo\b|cable|trecce|argyle|pleated (mini|skirt)|varsity|tennis|cricket|rugby|plaid|tartan|\bcheck/i],
+  ["Vintage", /vintage|retro|r[ée]tro|\b(60|70|80|90)s\b|flare|corduroy|\bcord\b|polka|pois|western|cowboy|suede|camoscio/i],
+  ["Mare", /\blinen|\blino\b|\blin\b|beach|resort|\bsandal|espadrill|raffia|rafia|kaftan|terry|spugna|swim/i],
+  ["Rock", /leather jacket|biker|\bstud|borchie|combat|grunge|\bmesh\b|chain|skull|lace[- ]up boot|creeper|platform boot|faux leather/i],
+  ["Streetwear", /cargo|hoodie|graphic|oversized tee|baggy|parachute|bomber|logo|skate|puffer|track jacket/i],
+  ["Sportivo", /legging|jogger|track ?pant|running|\bactive|sport|training|yoga|tennis skirt|sneaker/i],
+  ["Casual", /\bjeans?\b|denim|t-?shirt|\btee\b|sweatshirt|felpa|hoodie|sneaker|chino|henley|\bknit\b|maglion|sweater|jumper|cardigan|overshirt/i],
+];
+/** Gli stili di un capo (al massimo 4), calcolati una volta. */
+export function stiliDi(c, negozi) {
+  if (c._st) return c._st;
+  const st = new Set(), base = DAL_NEGOZIO[negozi[c.n].stile], r = registro(c);
+  if (base) st.add(base);
+  for (const [nome, rx] of REGOLE_STILE) if (rx.test(c.t)) st.add(nome);
+  if (c.q === "fiori") st.add("Romantico"); if (c.q === "righe") st.add("Chic"); if (c.q === "pois") st.add("Vintage"); if (c.q === "quadri") st.add("Preppy");
+  if (c.f === "lino") st.add("Mare"); if (c.f === "denim" || c.c === "jeans") st.add("Casual"); if (c.f === "velluto") st.add("Vintage");
+  if (r === 3) st.add("Elegante"); if (r === 0) st.add("Sportivo");
+  const neutro = tipoColore(c) === "neutro", liscio = !c.q && !/ruffle|frill|lace|sequin|print|stampa|logo|graphic|embroider|fringe/i.test(c.t);
+  const espressivo = ["Sportivo", "Streetwear", "Rock", "Boho", "Romantico", "Vintage", "Sera"].some(x => st.has(x));
+  if (neutro && liscio && r >= 2 && !espressivo) st.add("Minimal");
+  if (tipoColore(c) === "acceso" && !c.q) st.add("Colorato");
+  // coerenza: un capo a fantasia o con volant non è Minimal anche se il negozio lo è; un capo neutro non è Colorato
+  if (!(neutro && liscio) || r === 0) st.delete("Minimal");
+  if (tipoColore(c) === "neutro") st.delete("Colorato");
+  if (r >= 3 && (/cashmere|silk|seta|soie|leather|pelle|cuir/i.test(c.t) || ["cashmere", "seta", "pelle"].includes(c.f)) && c.e >= 250) st.add("Lusso");
+  // ciò che contraddice il livello di eleganza esce: niente "Ufficio" o "Elegante" per una felpa, niente "Sportivo" per un blazer
+  if (r <= 1) { st.delete("Ufficio"); st.delete("Elegante"); st.delete("Lusso"); st.delete("Sera"); }
+  if (r >= 2) st.delete("Sportivo");
+  if (!st.size) st.add(r >= 2 ? "Classico" : "Casual");
+  return c._st = st;
+}
+/** Lo stile principale (per i punteggi): il primo degli stili del capo che è anche nello stile guida, se no il primo. */
+const stilePrincipale = (c, negozi) => [...stiliDi(c, negozi)][0];
 /** Quanto è elegante un capo: 0 sportivo, 1 casual, 2 curato, 3 elegante (dal catalogo; senza dato vale "curato"). */
 // jeans, chambray, cargo, felpe e tute in denim sono al massimo "casual", qualunque cosa dica il dato (giro 9: ✓ elegante su un vestito di jeans)
 const RX_CASUAL_SEMPRE = /sneakers?|trainers?|new balance|zapatilla|\bcasual\b|\bdenim\b|\bjeans?\b|chambray|vaquer|cargo|sweatshirt|hoodie|\bfelpa|jogger|track ?pants?/i;
 export const registro = c => { const r = c.r ?? 2; return c.c === "jeans" || RX_CASUAL_SEMPRE.test(c.t) ? Math.min(r, 1) : r; };
 // stili che non vogliono capi sportivi, e quelli che chiedono almeno "curato" (Andrea 20/11: lusso italiano ≠ hip hop)
-const SENZA_SPORT = new Set(["Lusso", "Italiano", "Sera", "Parigino", "Minimal", "Maglieria", "Romantico", "Curvy"]);
-const CURATI = new Set(["Lusso", "Italiano", "Sera"]);
+const SENZA_SPORT = new Set(["Lusso", "Classico", "Sera", "Chic", "Minimal", "Romantico", "Elegante", "Ufficio", "Preppy"]);
+const CURATI = new Set(["Lusso", "Classico", "Sera", "Elegante", "Ufficio"]);
 // negozi di scarpe che non stanno con stili curati se non li si sceglie
 const SCARPE_DI_STRADA = new Set(["Rock", "Streetwear", "Sportivo"]);
 /** Il capo è ammesso dagli stili scelti? `stretto` = solo gli stili scelti, altrimenti anche gli affini. */
@@ -125,15 +174,16 @@ export function compatibile(capo, stili, negozi) {
 }
 export function nelloStile(capo, stili, negozi, stretto) {
   if (!stili?.length) return true;
-  const st = negozi[capo.n].stile;
   if (!eleganzaOk(capo, stili)) return false;
-  // le scarpe le fanno pochi negozi: conta che non siano di un negozio "di strada" se lo stile non lo è
-  if (postoDi(capo) === "scarpe") return stili.includes(st) || !SCARPE_DI_STRADA.has(st) || stili.some(s => SCARPE_DI_STRADA.has(s));
-  return stili.includes(st) || (!stretto && stili.some(s => AFFINI[s].includes(st)));
+  const st = stiliDi(capo, negozi), negozio = negozi[capo.n].stile;
+  // le scarpe: basta che non siano di un negozio "di strada" se lo stile non lo è, o che abbiano lo stile
+  if (postoDi(capo) === "scarpe") return stili.some(s => st.has(s)) || !SCARPE_DI_STRADA.has(negozio) || stili.some(s => SCARPE_DI_STRADA.has(s));
+  return stili.some(s => st.has(s)) || (!stretto && stili.some(s => AFFINI[s]?.some(a => st.has(a))));
 }
 // senza stili scelti si parte da quelli più portabili, non da quelli di nicchia (sera, rock…)
-const COMUNI = ["Minimal", "Parigino", "Denim", "Colore", "Italiano", "Maglieria", "Sostenibile", "Romantico"];
-const affinita = (a, b) => a === b ? 2 : AFFINI[a]?.includes(b) ? 1 : -2;
+const COMUNI = ["Minimal", "Casual", "Chic", "Classico", "Romantico", "Colorato"];
+/** Quanto un capo sta con uno stile: 2 se lo ha, 1 se ne ha uno affine, -2 se no. */
+const affinita = (guida, st) => st.has(guida) ? 2 : AFFINI[guida]?.some(a => st.has(a)) ? 1 : -2;
 
 // ---------- stagione ----------
 const DA_CALDO = /hot ?pants?\b|hotpant|\bsummer\b|\bbeach\b|\bplage\b|\bplaya\b|\bsheer\b|\bvoile\b|\bgauze\b|hot ?pants|shorty|skort|\bthong\b|infradito|pantal[oó]n corto|pantaloncin|short pants|kurze hose|halter|strapless|backless|bandeau|sandal|slide|adilette|slipper|pantofol|ciabatt|claquette|\bmules?\b|slingback|open.?toe|strappy|feather|espadrill|flip.?flop|tong\b|shorts?\b|bermuda|\blinen|\blin\b|\blino\b|crochet|raffia|sleeveless|sans manches|d[ée]bardeur|canott|\btank\b|\bcami\b|bandeau|bikini|mini ?short/i;
@@ -167,9 +217,9 @@ export function punteggio(capo, scelti, ctx) {
   const { profilo, negozi, stileGuida } = ctx;
   let p = 0;
   // stile: vicino allo stile guida e a quello dei capi già scelti
-  const st = negozi[capo.n].stile, pesoStile = postoDi(capo) === "scarpe" ? 0.4 : 1;   // poche marche fanno scarpe: lo stile pesa meno
+  const st = stiliDi(capo, negozi), pesoStile = postoDi(capo) === "scarpe" ? 0.4 : 1;   // poche marche fanno scarpe: lo stile pesa meno
   if (stileGuida) p += affinita(stileGuida, st) * pesoStile;
-  for (const s of scelti) p += affinita(negozi[s.n].stile, st) * 0.5 * pesoStile;
+  for (const s of scelti) p += affinita(stilePrincipale(s, negozi), st) * 0.5 * pesoStile;
   // colore: al massimo un colore acceso o una fantasia, il resto neutri
   const tipo = tipoColore(capo), altri = scelti.map(tipoColore);
   if (tipo === "neutro") p += 1.5;
@@ -263,7 +313,7 @@ export function componi(capi, ctx, partenza = outfitVuoto(), bloccati = new Set(
   daFare.sort((a, b) => PESO[b] - PESO[a]);
 
   const stileGuida = profilo.stili?.length ? profilo.stili[Math.floor(rnd() * profilo.stili.length)]
-    : capiDi(o).length ? negozi[capiDi(o)[0].n].stile : COMUNI[Math.floor(rnd() * COMUNI.length)];
+    : capiDi(o).length ? stilePrincipale(capiDi(o)[0], negozi) : COMUNI[Math.floor(rnd() * COMUNI.length)];
   const c2 = { ...ctx, stileGuida };
   const manca = [], largo = [], fuoriPalette = [];
   let resto = profilo.budget - totale(o);
@@ -321,7 +371,7 @@ export function inPalette(capo, stagione, posto = postoDi(capo)) {
 export function alternative(capi, ctx, outfit, posto, entro) {
   const { profilo } = ctx, esclusi = ctx.esclusi || new Set();
   const altri = capiDi({ ...outfit, [posto]: null, ...(posto === "abito" ? { sopra: null, sotto: null } : { abito: posto === "scarpe" || posto === "capospalla" ? outfit.abito : null }) });
-  const stileGuida = altri.length ? ctx.negozi[altri[0].n].stile : profilo.stili?.[0];
+  const stileGuida = profilo.stili?.[0] || (altri.length ? stilePrincipale(altri[0], ctx.negozi) : null);
   const c2 = { ...ctx, stileGuida };
   return capi
     .filter(c => postoDi(c) === posto && !esclusi.has(chiave(c)) && haTaglia(c, profilo) && !(profilo.genere === "u" && c.c === "gonna")

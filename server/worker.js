@@ -198,7 +198,7 @@ async function generaControllata(env, modello, corpo) {
 }
 
 // --- lo stylist: dal testo libero a una richiesta che l'app sa comporre col catalogo vero (l'AI non inventa capi)
-const STILI = ["Minimal", "Parigino", "Lusso", "Romantico", "Boho", "Colore", "Italiano", "Maglieria", "Sostenibile", "Denim", "Curvy", "Sportivo", "Streetwear", "Sera", "Rock"];
+const STILI = ["Minimal", "Classico", "Chic", "Ufficio", "Elegante", "Lusso", "Sera", "Romantico", "Boho", "Vintage", "Preppy", "Casual", "Mare", "Colorato", "Sportivo", "Streetwear", "Rock"];
 const COLORI = ["nero", "bianco", "panna", "beige", "cammello", "marrone", "grigio", "blu", "navy", "azzurro", "verde", "oliva", "rosso", "bordeaux", "rosa", "arancione", "giallo", "viola", "lilla"];
 const MATERIALI = ["cashmere", "lana", "seta", "lino", "pelle", "denim", "velluto", "cotone", "viscosa"];
 const SISTEMA_STYLIST = `You are the stylist of Camerino, a fashion app that builds complete outfits from real products of online shops.
@@ -218,7 +218,7 @@ Rules:
 - "risposta": for "look", one or two short friendly sentences in the language required below, saying what you are putting together (no product names, no prices you can't know). If the request is not about clothes, say kindly what you can do.
 - "lingua": the language the user wrote this message in (ISO code). "risposta" is in that language.
 - "budget": total euros for the whole outfit only if the user writes an amount or says cheap/expensive in THIS or the previous request; otherwise null (do not copy the current budget).
-- "stili": zero to two of ${JSON.stringify(STILI)} that fit the request (office → Minimal/Italiano, evening/party → Sera, sport → Sportivo, etc.).
+- "stili": zero to two of ${JSON.stringify(STILI)} that fit the request (office → Ufficio/Classico, dinner/ceremony → Elegante, evening/party → Sera, Parisian/chic → Chic, beach/holiday → Mare, sport → Sportivo, everyday → Casual, etc.).
 - "elegante": true for dinners, evenings, ceremonies, office/work, dates, theatre: then also choose a fitting "tipo" for each piece (e.g. camicia or maglia, pantaloni or gonna, tacchi or stivali or mocassini).
 - colours only from ${JSON.stringify(COLORI)}; materials only from ${JSON.stringify(MATERIALI)}. Leave a field null or [] if the user doesn't ask; do not over-constrain.
 - "caldo": true if the user asks for summer/hot weather/beach/holiday in a warm place, false if winter/snow/cold, else null.

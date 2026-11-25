@@ -13,7 +13,8 @@ const mesiFreddi = () => { const m = new Date().getMonth(); return m >= 9 || m <
 const CHIAVE = "camerino-v2";
 const salvato = (() => { try { return JSON.parse(localStorage.getItem(CHIAVE)) || {}; } catch { return {}; } })();
 const profilo = Object.assign({ avatar: null, avatari: [], genere: null, tagliaSopra: null, tagliaSotto: null, scarpa: null, stagione: null, budget: 400, stili: [], conCapospalla: mesiFreddi(), pronto: false }, salvato.profilo);
-profilo.freddo = mesiFreddi();            // la stagione viene dal calendario; "conCapospalla" dice solo se vuole la giacca
+profilo.freddo = mesiFreddi();
+profilo.stili = S.stiliNuovi(profilo.stili);   // 25/11: stili rifatti (Parigino → Chic, Italiano → Classico…)            // la stagione viene dal calendario; "conCapospalla" dice solo se vuole la giacca
 let outfit = S.outfitVuoto();
 let bloccati = new Set(salvato.bloccati || []);
 let salvati = salvato.salvati || [];          // [{ capi: [chiavi], quando, nome? }]
@@ -57,14 +58,27 @@ async function chiediPulita(percorso, corpo) {
   }
   return d;
 }
+// le viste di lato e da dietro si preparano in anticipo, in parallelo, appena c'è una figura nuova davanti:
+// quando si gira l'avatar sono già pronte (Emanuele 25/11: "devono essere immediate")
+const inArrivo = {};
+function chiediVista(fronte, vista, rifai = false) {
+  const k = fronte + "|" + vista;
+  if (!rifai && inArrivo[k]) return inArrivo[k];
+  return inArrivo[k] = chiediPulita("/gira", { immagine: fronte, vista, ...(rifai ? { rifai: true } : {}) })
+    .then(d => { if (d.errore === undefined && d.url) { giri[k] = d.url; ricordaGiri(); } return d; })
+    .finally(() => { delete inArrivo[k]; });
+}
+function preparaViste(fronte) {
+  if (!SERVER || !fronte) return;
+  for (const v of ["destra", "dietro", "sinistra"]) if (!giri[fronte + "|" + v]) chiediVista(fronte, v).then(() => { if (!$("s-camerino").hidden) disegnaPalco(); }).catch(() => {});
+}
 async function gira(fronte, vista, rifai = false) {
   const k = fronte + "|" + vista;
   if ((giri[k] && !rifai) || girando) return;
   girando = k; disegnaPalco();
   try {
-    const d = await chiediPulita("/gira", { immagine: fronte, vista, ...(rifai ? { rifai: true } : {}) });
+    const d = await chiediVista(fronte, vista, rifai);
     if (d.errore !== undefined || !d.url) throw new Error(d.errore || "Non sono riuscito a girare l'avatar. Riprova.");
-    giri[k] = d.url; ricordaGiri();
     if (d.restano != null && d.restano <= 3) toast(d.restano ? `Oggi ti restano ${d.restano} immagini` : "Era l'ultima immagine di oggi");
   } catch (e) { toast(e.message || "Non sono riuscito a girare l'avatar. Riprova."); if (girando === k) vistaGiro = 0; }
   finally { girando = null; if (!$("s-camerino").hidden) disegnaPalco(); }
@@ -83,7 +97,7 @@ async function provaLook(rifai = false) {
     if (d.errore !== undefined || !d.url) throw new Error(d.errore || "Non sono riuscito a vestire l'avatar. Riprova.");
     // il look rifatto: le viste girate del vecchio non valgono più
     if (rifai && prove[k]) for (const x of Object.keys(giri)) if (x.startsWith(prove[k] + "|")) delete giri[x];
-    prove[k] = d.url; ricordaProve();
+    prove[k] = d.url; ricordaProve(); preparaViste(d.url);
     if (chiaveLook() === k) { vestito = true; vistaAvatar = 0; vistaGiro = 0; }
     if (d.restano != null && d.restano <= 3) toast(d.restano ? `Oggi ti restano ${d.restano} prove` : "Era l'ultima prova di oggi");
   } catch (e) { toast(e.message || "Non sono riuscito a vestire l'avatar. Riprova."); }
@@ -325,24 +339,38 @@ $("apri-profilo").onclick = () => apriAccount();
 // CAMERINO — l'avatar a tutto schermo, i capi del look di fianco
 // ======================================================================
 /** Carica i capi di un genere ("d" o "u"). Restituisce false se la rete non va. */
+// filtri dei pantaloni più precisi (Andrea 24/11: "non si riesce a selezionare il modello che uno ha in mente"), dal nome del capo
+const GAMBE = [["palazzo", /palazzo/i], ["culotte", /culotte/i], ["jogger", /jogger/i], ["bootcut", /boot ?cut/i], ["svasata", /flare|flared|[ée]vas[ée]|acampanad|zampa/i],
+  ["barrel", /barrel|balloon|horseshoe/i], ["affusolata", /taper|carrot|peg\b/i], ["sigaretta", /cigarette|sigaretta/i], ["skinny", /skinny|slim leg|slim fit/i],
+  ["ampia", /wide|ampi|large|loose|baggy/i], ["dritta", /straight|droit|dritt|recto|column/i]];
+const VITE = [["altissima", /ultra[- ]?high|super[- ]?high|extra[- ]?high/i], ["alta", /high[- ]?(rise|waist)|taille haute|vita alta|tiro alto|high[- ]waisted/i],
+  ["media", /mid[- ]?(rise|waist)|vita media|taille mi/i], ["bassa", /low[- ]?(rise|waist)|taille basse|vita bassa|tiro bajo/i]];
+function gambaEVita(c) {
+  c.b = GAMBE.find(([, rx]) => rx.test(c.t))?.[0]; c.j = VITE.find(([, rx]) => rx.test(c.t))?.[0];
+  if ((!c.l || c.l === "media") && /ankle|7\/8|cropped|caviglia|\bcrop\b/i.test(c.t)) c.l = "caviglia";
+}
 /** Una foto per stile: un capo che lo rappresenta davvero (regole per stile sotto), sempre lo stesso a parità di catalogo. */
 const SATURO = c => { if (!c.x) return false; const [, a, b] = S.lab(c.x); return Math.hypot(a, b) > 38; };
-const TIPICO = {
-  Minimal: c => S.tipoColore(c) === "neutro" && !/ruffle|frill|floral|print|stripe|check|volant/i.test(c.t),
-  Parigino: c => /stripe|mariniere|marinière|ray[ée]|breton/i.test(c.t) || (S.tipoColore(c) === "neutro" && c.c === "camicia"),
-  Lusso: c => S.registro(c) === 3 && S.tipoColore(c) === "neutro", Italiano: c => S.registro(c) === 3,
-  Romantico: c => /ruffle|frill|lace|floral|bow|volant|pizzo|dentelle/i.test(c.t), Boho: c => /floral|maxi|crochet|paisley|embroider|fringe/i.test(c.t),
-  Colore: c => SATURO(c) && !/print|stripe|check/i.test(c.t), Maglieria: c => c.c === "maglia", Denim: c => c.c === "jeans" || c.f === "denim" || /denim|chambray/i.test(c.t),
-  Sera: c => S.registro(c) === 3 && (c.c === "abito" || /satin|silk|sequin|velvet/i.test(c.t)), Rock: c => /black|noir|nero/i.test(c.t + " " + (c.k || "")) || S.tipoColore(c) === "neutro",
-  Sportivo: c => S.registro(c) <= 1, Streetwear: c => S.registro(c) <= 1,
+const TIPICO = {      // per la foto di ogni stile: il capo deve "dirlo" a colpo d'occhio
+  Minimal: c => S.tipoColore(c) === "neutro" && !c.q, Chic: c => c.q === "righe" || /trench|breton|marini/i.test(c.t), Classico: c => S.registro(c) >= 2 && /blazer|coat|cappotto|shirt|camicia|trouser/i.test(c.t),
+  Ufficio: c => /blazer|tailored|trouser/i.test(c.t) && S.tipoColore(c) === "neutro" && !c.q && !/denim|jean|print|leopard/i.test(c.t),
+  Elegante: c => S.registro(c) === 3 && !c.q && (c.c === "abito" || /blazer|blouse|satin|silk/i.test(c.t)) && !/leopard|animal|print/i.test(c.t),
+  Lusso: c => S.registro(c) === 3 && !c.q && S.tipoColore(c) === "neutro" && /cashmere|silk|seta|leather|wool coat|cappotto|manteau|coat/i.test(c.t),
+  Sera: c => c.c === "abito" && /satin|sequin|velvet|slip/i.test(c.t), Romantico: c => /ruffle|frill|lace|bow|floral|puff/i.test(c.t) || c.q === "fiori",
+  Boho: c => /crochet|fringe|paisley|embroider|maxi|tiered/i.test(c.t), Vintage: c => /vintage|retro|corduroy|western|suede|polka/i.test(c.t),
+  Preppy: c => /polo|cable|argyle|pleated|varsity|cardigan/i.test(c.t), Casual: c => c.c === "jeans" || /t-?shirt|tee|sweat|denim/i.test(c.t),
+  Mare: c => /linen|lino|crochet|beach|resort/i.test(c.t), Colorato: c => SATURO(c) && !c.q, Sportivo: c => S.registro(c) === 0,
+  Streetwear: c => /cargo|hoodie|graphic|oversized|baggy|bomber/i.test(c.t), Rock: c => /leather|biker|mesh|stud|black/i.test(c.t),
 };
 function fotoStili(d, g) {
+  // per ogni stile il capo più "puro": ha quello stile e pochi altri, sopra o abito, curato; sempre lo stesso a parità di catalogo
   const out = {}, hash = t => [...t].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
+  const capi = d.capi.filter(c => (c.c === "abito" && g !== "u" || ["camicia", "maglia", "top", "jeans", "capospalla"].includes(c.c)) && !/\bmen'?s\b|\bwomen'?s\b|pijama|pyjama|pigiama/i.test(c.t));
   for (const k of S.STILI) {
-    const tutti = d.capi.filter(c => d.negozi[c.n].stile === k && (c.c === "abito" && g !== "u" || ["camicia", "maglia", "top", "jeans"].includes(c.c)) && !/\bmen'?s\b|\bwomen'?s\b|pijama|pyjama/i.test(c.t));
-    const buoni = tutti.filter(c => (TIPICO[k] || (() => true))(c) && (["Sportivo", "Streetwear", "Denim"].includes(k) || S.registro(c) >= 2));
-    const lista = buoni.length ? buoni : tutti;
-    if (lista.length) out[k] = lista.sort((a, b) => hash(a.h) - hash(b.h))[0];
+    const l = capi.filter(c => S.stiliDi(c, d.negozi).has(k) && (TIPICO[k] || (() => true))(c)
+      && (["Rock", "Streetwear", "Sportivo"].includes(k) || !["Rock", "Streetwear", "Sportivo"].includes(d.negozi[c.n].stile)) && !/dot|spot|pois|polka|moucheti/i.test(c.t + " " + (k === "Vintage" ? "" : c.k || "") + " " + (c.v || "")));
+    if (!l.length) continue;
+    out[k] = l.sort((a, b) => S.stiliDi(a, d.negozi).size - S.stiliDi(b, d.negozi).size || hash(a.h) - hash(b.h))[0];
   }
   return out;
 }
@@ -355,7 +383,7 @@ async function carica(g) {
   // capi dell'altro genere finiti nel catalogo sbagliato ("Men's" tra la donna) e pigiami: fuori (collaudo giro 2)
   const altroGenere = g === "u" ? /\bwmns\b|\bwom[ae]n'?s?\b|\bdonna\b|\bfemme\b|\bmujer\b/i : /\bmen'?s\b|\bhomme\b|\buomo\b|\bhombre\b/i;
   DATI.capi = DATI.capi.filter(c => !altroGenere.test(c.t) && !/pijama|pyjama|pajama|pigiama|loungewear|nightwear|sleepwear|\bslip\b(?! ?(dress|skirt|abito|gonna|robe))|\bhipster\b(?! ?(jeans?|trousers?|pants?|skirt|flare|denim))|\bbriefs?\b|\bdog\b|\bpet\b|\bper cani\b|\bchien\b|\bperro\b|m[üu]tze|\bbeanie\b|\bbucket hat\b|\bcappellin|\bgorro\b/i.test(c.t));
-  for (const c of DATI.capi) c.dom = DATI.negozi[c.n].dominio;
+  for (const c of DATI.capi) { c.dom = DATI.negozi[c.n].dominio; if (c.c === "pantaloni" || c.c === "jeans") gambaEVita(c); }
   INDICE = new Map(DATI.capi.map(c => [S.chiave(c), c]));
   genereDati = g;
   return true;
@@ -560,6 +588,7 @@ function disegnaPalco(messaggio) {
     src = girata || fronte; if (!girata) attesa = true;
   }
   palcoOra = { src, specchio, fronte, base };
+  if (!base && fronte && modoPalco === "avatar") preparaViste(fronte);     // anche per prove/avatar fatti prima (le viste restano 30 giorni sul server)
   const pillola = !SERVER ? `<button class="pillola" id="info-prova">I capi sull'avatar arrivano presto</button>`
     : inCorso === k ? `<span class="pillola">Sto vestendo l'avatar…</span>`
     : girando ? `<span class="pillola">Sto girando l'avatar…</span>`
@@ -789,10 +818,13 @@ $("schede").onclick = e => {
 // (fantasia = campo q: "m" nel catalogo vuol dire colore stimato dalla foto) un capo di cui il negozio non dice il materiale (o la fantasia, lo scollo…) non compare quando si filtra per quello.
 // ======================================================================
 const NOMI_FILTRI = {
+  st: Object.fromEntries(S.STILI.map(x => [x, x])),
+  b: { dritta: "Dritta", ampia: "Ampia / wide leg", palazzo: "Palazzo", svasata: "Svasata / flare", bootcut: "Bootcut", affusolata: "Affusolata / tapered", barrel: "Barrel / a botte", sigaretta: "A sigaretta", skinny: "Skinny", culotte: "Culotte", jogger: "Jogger" },
+  j: { bassa: "Vita bassa", media: "Vita media", alta: "Vita alta", altissima: "Vita altissima" },
   f: { cotone: "Cotone", lana: "Lana", cashmere: "Cashmere", seta: "Seta", lino: "Lino", pelle: "Pelle", denim: "Denim", velluto: "Velluto", viscosa: "Viscosa", sintetico: "Sintetico" },
   q: { righe: "A righe", quadri: "A quadri", fiori: "Floreale", pois: "A pois", animalier: "Animalier", stampa: "Altre stampe" },
   a: { aderente: "Aderente", regolare: "Regolare", ampia: "Ampia", oversize: "Oversize" },
-  l: { corta: "Corta", normale: "Normale", lunga: "Lunga" },
+  l: { corta: "Corta", caviglia: "Alla caviglia / 7/8", normale: "Normale", lunga: "Lunga" },
   w: { senza: "Senza maniche", corte: "Maniche corte", "3/4": "Maniche 3/4", lunghe: "Maniche lunghe" },
   z: { v: "Scollo a V", giro: "Girocollo", alto: "Collo alto", quadrato: "Scollo quadrato", spalle: "Spalle scoperte", americana: "All'americana" },
   r: { "3": "Elegante", "2": "Curato", "1": "Casual", "0": "Sportivo" },
@@ -810,7 +842,8 @@ const ORDINI = [["consigliati", "Consigliati"], ["prezzo-su", "Prezzo crescente"
 /** I filtri nell'ordine in cui si vedono; `per` dice in quali posti hanno senso. */
 const GRUPPI = [
   { k: "y", nome: "Tipo", per: p => p === "scarpe" }, { k: "u", nome: "Tacco", per: p => p === "scarpe" },
-  { k: "colore", nome: "Colore" }, { k: "prezzo", nome: "Prezzo" }, { k: "marca", nome: "Marca" }, { k: "r", nome: "Occasione" },
+  { k: "st", nome: "Stile" }, { k: "colore", nome: "Colore" }, { k: "prezzo", nome: "Prezzo" }, { k: "marca", nome: "Marca" }, { k: "r", nome: "Occasione" },
+  { k: "b", nome: "Forma", per: p => p === "sotto" }, { k: "j", nome: "Vita", per: p => p === "sotto" },
   { k: "f", nome: "Materiale", per: p => p !== "scarpe" }, { k: "q", nome: "Fantasia", per: p => p !== "scarpe" },
   { k: "a", nome: "Vestibilità", per: p => p !== "scarpe" }, { k: "l", nome: "Lunghezza", per: p => ["sotto", "abito", "capospalla"].includes(p) },
   { k: "w", nome: "Maniche", per: p => ["sopra", "abito"].includes(p) }, { k: "z", nome: "Scollo", per: p => ["sopra", "abito"].includes(p) },
@@ -827,6 +860,7 @@ const colorePassa = (c, v) => !c.m && c.x && Math.hypot(...S.lab(c.x).map((x, i)
 /** Un valore del capo per un filtro (per contare e filtrare). */
 function passaUno(c, k, v) {
   if (k === "colore") return colorePassa(c, v);
+  if (k === "st") return S.stiliDi(c, DATI.negozi).has(v);
   if (k === "prezzo") return c.e >= FASCE[v][0] && c.e < FASCE[v][1];
   if (k === "marca") return c.n === +v;
   if (k === "r") return String(S.registro(c)) === v;
@@ -1170,7 +1204,8 @@ function descrizioneTesto(html) {
 /** Materiale, lunghezza e maniche come li dice il negozio (dal catalogo). */
 function dettagliCapo(c) {
   const voci = [c.f && ["Materiale", NOMI_FILTRI.f[c.f]], c.l && ["Lunghezza", NOMI_FILTRI.l[c.l === "media" ? "normale" : c.l]], c.w && ["Maniche", NOMI_FILTRI.w[c.w]],
-    c.q && ["Fantasia", NOMI_FILTRI.q[c.q]], c.a && ["Vestibilità", NOMI_FILTRI.a[c.a]], c.z && ["Scollo", NOMI_FILTRI.z[c.z]]].filter(Boolean);
+    c.q && ["Fantasia", NOMI_FILTRI.q[c.q]], c.a && ["Vestibilità", NOMI_FILTRI.a[c.a]], c.z && ["Scollo", NOMI_FILTRI.z[c.z]],
+    c.b && ["Forma", NOMI_FILTRI.b[c.b]], c.j && ["Vita", NOMI_FILTRI.j[c.j]], DATI && ["Stile", [...S.stiliDi(c, DATI.negozi)].slice(0, 3).join(", ")]].filter(Boolean);
   return voci.length ? `<div class="campo"><div class="voci">${voci.map(([a, b]) => `<span><small>${a}</small>${b}</span>`).join("")}</div></div>` : "";
 }
 
@@ -1347,6 +1382,7 @@ function usaAvatar(a) {
   profilo.avatar = a;
   if (a && a.creato && !profilo.avatari.some(x => x.url === a.url)) profilo.avatari = [a, ...profilo.avatari].slice(0, 8);
   vistaAvatar = 0; vistaGiro = 0; vestito = true; ricorda(); if (!$("s-camerino").hidden) disegna();
+  if (a?.url) preparaViste(a.url);
 }
 async function chiediAvatar(corpo) {
   const d = await chiediPulita("/avatar", { genere: profilo.genere, ...corpo });

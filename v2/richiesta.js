@@ -8,7 +8,7 @@ export const COLORI_FILTRO = [["nero", "#141414"], ["bianco", "#f7f7f5"], ["pann
 const LAB = Object.fromEntries(COLORI_FILTRO.map(([v, hex]) => [v, S.lab(hex)]));
 // il colore stimato dalla foto (m) non conta: le foto con modella e sfondo ingannano (Andrea 20/11)
 export const coloreDi = (c, nome) => !c.m && c.x && LAB[nome] && Math.hypot(...S.lab(c.x).map((v, i) => v - LAB[nome][i])) < 16;
-const lunghezzaOk = (c, v) => v === "normale" ? !c.l || c.l === "media" : c.l === v;
+const lunghezzaOk = (c, v) => v === "normale" ? !c.l || c.l === "media" : v === "lunga" ? c.l === "lunga" : c.l === v || (v === "corta" && c.l === "caviglia" && false);
 
 export const RX_SCARPE = { stivali: /boot|botte|bottine|stival/i, sneakers: /sneaker|trainer|basket/i, tacchi: /heel|pump|escarpin|d[ée]collet|tacc|stiletto|slingback|mary ?jane/i,
   sandali: /sandal/i, mocassini: /loafer|mocassin|moccasin/i, ballerine: /ballet|ballerin|\bflats?\b/i };
@@ -35,7 +35,7 @@ export function vaPerRichiesta(c, r, negozi) {
   if (r.abito === false && p === "abito") return false;
   // un vestito chiesto non è una tuta (collaudo 25/11: "vestito rosso" → tuta marrone)
   if (p === "abito" && !r.tuta && /jumpsuit|playsuit|romper|overall|\btuta\b|combinaison|salopette|boiler ?suit/i.test(c.t)) return false;
-  if (r.stili?.length && p !== "scarpe" && !r.stili.includes(negozi[c.n].stile)) return false;
+  if (r.stili?.length && p !== "scarpe" && !r.stili.some(x => S.stiliDi(c, negozi).has(x))) return false;
   if (r.elegante && S.registro(c) < 2) return false;                      // per una cena: niente casual né sportivo, scarpe comprese
   if (r.elegante && p !== "scarpe" && RX_SPORT.test(c.t)) return false;
   if (r.elegante && RX_NON_ELEGANTE.test(c.t)) return false;
