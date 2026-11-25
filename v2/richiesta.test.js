@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import * as S from "./stylist.js";
 import { lookPerRichiesta, scarpaDiTipo } from "./richiesta.js";
+import * as R from "./richiesta.js";
 const D = JSON.parse(readFileSync(new URL(process.env.CATALOGO || "../data/v2-donna.json", import.meta.url)));
 const prof = { genere: "d", tagliaSopra: "M", tagliaSotto: "M", scarpa: 38, stagione: "autunno", budget: 300, stili: [], conCapospalla: true, freddo: true };
 const pz = (tipo, x = {}) => ({ tipo, colori: [], materiale: null, ...x });
@@ -39,4 +40,45 @@ test("sottocategorie: ogni capo del sopra ne ha una, felpe e camicie riconosciut
   assert.equal(S.sottoDi({ c: "top", t: "Crew Neck T Shirt | White" }), "tshirt");
   assert.equal(S.sottoDi({ c: "top", t: "Dayna Top - China" }), "top");
   for (const c of D.capi.slice(0, 3000)) if (S.SOTTOCATEGORIE[S.postoDi(c)]) assert.ok(S.sottoDi(c));
+});
+// collaudo giro 1: il cappotto chiesto c'è sempre; la stagione chiesta vince sul calendario
+test("cappotto cammello e pantaloni neri: c'è il cappotto", () => {
+  const r = { budget: null, stili: [], elegante: false, giacca: true, abito: null, sopra: null, sotto: pz("pantaloni", { colori: ["nero"] }), scarpe: null, giacca_dettagli: pz("cappotto", { colori: ["cammello"] }) };
+  for (let s = 1; s <= 20; s++) {
+    const l = lookPerRichiesta(r, { profilo: { ...prof, budget: 400 }, negozi: D.negozi, capi: D.capi, rnd: S.casuale(1e6 + s * 104729) });
+    assert.ok(l.outfit.capospalla, "manca il cappotto");
+    assert.match(l.outfit.capospalla.t, /coat|manteau|cappott|abrigo/i, `non è un cappotto: "${l.outfit.capospalla.t}"`);
+    assert.equal(l.outfit.sotto?.c, "pantaloni");
+  }
+});
+test("look da spiaggia a novembre: niente stivali né lana", () => {
+  const r = { budget: null, stili: [], elegante: false, giacca: null, caldo: true, abito: null, sopra: null, sotto: null, scarpe: null };
+  for (let s = 1; s <= 20; s++) {
+    const l = lookPerRichiesta(r, { profilo: prof, negozi: D.negozi, capi: D.capi, rnd: S.casuale(1e6 + s * 7919) });
+    for (const c of S.capiDi(l.outfit)) assert.ok(!S.fuoriStagione(c, false), `fuori stagione: "${c.t}"`);
+    assert.equal(l.outfit.capospalla, null, "giacca in spiaggia");
+  }
+});
+// giro 4: "cena elegante, stivali neri" non dà scarponi con plateau né negozi rock
+test("cena elegante, stivali neri: stivali eleganti", () => {
+  const r = { budget: null, stili: ["Sera"], elegante: true, giacca: null, abito: null, sopra: null, sotto: null, scarpe: pz("stivali", { colori: ["nero"] }) };
+  for (let s = 1; s <= 30; s++) {
+    const l = lookPerRichiesta(r, { profilo: prof, negozi: D.negozi, capi: D.capi, rnd: S.casuale(1e6 + s * 31337) });
+    for (const c of S.capiDi(l.outfit)) {
+      assert.ok(!["Rock", "Streetwear", "Sportivo"].includes(D.negozi[c.n].stile), `negozio ${D.negozi[c.n].stile}: "${c.t}"`);
+      assert.ok(!/platform|plateau|creeper|combat|lug|chunky|stomper/i.test(c.t), `non elegante: "${c.t}"`);
+    }
+    assert.ok(scarpaDiTipo(l.outfit.scarpe, "stivali"), `non stivali: "${l.outfit.scarpe?.t}"`);
+  }
+});
+// collaudo 25/11 (stylist vero): "un vestito rosso per un matrimonio in estate sotto 200 euro" → un vestito rosso, mai una tuta
+test("vestito rosso per un matrimonio estivo: vestito, rosso, non tuta, nel budget", () => {
+  const r = { budget: 200, stili: ["Sera"], elegante: true, giacca: null, caldo: true, abito: null, sopra: null, sotto: null, scarpe: pz("sandali"), abito_dettagli: { colori: ["rosso"], materiale: null, lunghezza: null, maniche: "senza" }, giacca_dettagli: null };
+  for (let s = 1; s <= 10; s++) {
+    const l = lookPerRichiesta(r, { profilo: prof, negozi: D.negozi, capi: D.capi, rnd: S.casuale(1e6 + s * 7919) });
+    assert.ok(l.outfit.abito, "manca il vestito");
+    assert.ok(!/jumpsuit|romper|playsuit|overall|tuta/i.test(l.outfit.abito.t), `tuta: "${l.outfit.abito.t}"`);
+    assert.ok(R.coloreDi(l.outfit.abito, "rosso"), `non rosso: "${l.outfit.abito.t}"`);
+    assert.ok(S.totale(l.outfit) <= 200 || l.sforato);
+  }
 });

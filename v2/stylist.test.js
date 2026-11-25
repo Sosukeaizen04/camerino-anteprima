@@ -3,6 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { registro, nelloStile, inPalette, fuoriStagione, componi, alternative, metti, totale, completo, mancanti, outfitVuoto, capiDi, haTaglia, postoDi, casuale, tipoColore, chiave } from "./stylist.js";
+import * as S from "./stylist.js";
 
 const carica = g => JSON.parse(readFileSync(new URL(`../data/v2-${g}.json`, import.meta.url)));
 const DONNA = carica("donna"), UOMO = carica("uomo");
@@ -155,10 +156,33 @@ test("d'inverno niente abiti senza maniche o a maniche corte (salvo lana)", () =
 });
 test("catalogo: magliette, gonne in maglia e abiti-camicia al posto giusto", () => {
   const cat = t => DONNA.capi.find(c => c.t === t)?.c;
-  assert.equal(cat("76 Long Sleeve T Shirt"), "top");
+  if (cat("76 Long Sleeve T Shirt")) assert.equal(cat("76 Long Sleeve T Shirt"), "top");   // se è ancora in catalogo
   for (const c of DONNA.capi) {
     const t = c.t.toLowerCase();
     if (/\bskirt\b/.test(t) && !/dress/.test(t)) assert.equal(c.c, "gonna", c.t);
     if (/shirt ?dress|t-shirt dress/.test(t)) assert.equal(c.c, "abito", c.t);
+  }
+});
+// giro 4: un solo protagonista per look (una fantasia, niente doppio denim, niente sneakers con stili curati)
+test("coerenza: fantasie, denim e sneakers su 100 look per stile", () => {
+  const fant = c => !!c.q, denim = c => c.c === "jeans" || c.f === "denim" || /\bdenim\b|\bjean\b/i.test(c.t);
+  for (const st of ["Parigino", "Minimal", "Italiano"]) {
+    const p = { genere: "d", tagliaSopra: "M", tagliaSotto: "M", scarpa: 38, stagione: null, budget: 400, stili: [st], conCapospalla: true, freddo: true };
+    let dueFant = 0, dueDenim = 0, sneak = 0;
+    for (let s = 1; s <= 100; s++) {
+      const cc = S.capiDi(S.componi(DONNA.capi, { profilo: p, negozi: DONNA.negozi }, S.outfitVuoto(), new Set(), S.casuale(1e6 + s * 7919)).outfit);
+      if (cc.filter(fant).length > 1) dueFant++; if (cc.filter(denim).length > 1) dueDenim++;
+      if (cc.some(c => S.postoDi(c) === "scarpe" && (c.y === "sneakers" || /sneaker|trainer/i.test(c.t)))) sneak++;
+    }
+    assert.ok(dueFant <= 5 && dueDenim <= 5 && sneak <= 15, `${st}: due fantasie ${dueFant}, doppio denim ${dueDenim}, sneakers ${sneak} su 100`);
+  }
+});
+// giro 6: negli stili curati capi "base" (niente loghi, scritte, calzini, infradito, rafia, tie dye)
+test("stili curati: niente loghi, calzini, infradito, rafia su 100 look", () => {
+  const rx = /\blogo|graphic|slogan|\bsocks?\b|\bthong|infradito|raffia|rafia|espadrill|tie[- ]?dye/i;
+  for (const st of ["Minimal", "Lusso", "Parigino", "Italiano"]) {
+    const p = { genere: "d", tagliaSopra: "M", tagliaSotto: "M", scarpa: 38, stagione: null, budget: 400, stili: [st], conCapospalla: true, freddo: true };
+    for (let s = 1; s <= 100; s++) for (const c of S.capiDi(S.componi(DONNA.capi, { profilo: p, negozi: DONNA.negozi }, S.outfitVuoto(), new Set(), S.casuale(1e6 + s * 7919)).outfit))
+      assert.ok(!rx.test(c.t), `${st}: "${c.t}"`);
   }
 });

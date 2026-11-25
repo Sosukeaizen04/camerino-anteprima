@@ -10,7 +10,8 @@ const POSTO_DI = { top: "sopra", camicia: "sopra", maglia: "sopra", pantaloni: "
 export const postoDi = capo => POSTO_DI[capo.c];
 // `z` è il dominio del negozio, messo dall'app al caricamento: l'indice `n` cambia se una notte un negozio salta,
 // e gli outfit salvati o condivisi devono restare validi.
-export const chiave = c => `${c.z ?? c.n}|${c.h}|${c.v ?? ""}`;
+// `dom` = dominio del negozio, messo dall'app al caricamento (prima era `z`, che nel catalogo è lo scollo: il filtro Scollo non funzionava)
+export const chiave = c => `${c.dom ?? c.n}|${c.h}|${c.v ?? ""}`;
 
 // ---------- l'outfit ----------
 // Un outfit è { capospalla, sopra, sotto, scarpe, abito } (capo o null). L'abito occupa sopra e sotto.
@@ -100,7 +101,9 @@ export const AFFINI = {
 };
 export const STILI = Object.keys(AFFINI);
 /** Quanto è elegante un capo: 0 sportivo, 1 casual, 2 curato, 3 elegante (dal catalogo; senza dato vale "curato"). */
-export const registro = c => c.r ?? 2;
+// jeans, chambray, cargo, felpe e tute in denim sono al massimo "casual", qualunque cosa dica il dato (giro 9: ✓ elegante su un vestito di jeans)
+const RX_CASUAL_SEMPRE = /sneakers?|trainers?|new balance|zapatilla|\bcasual\b|\bdenim\b|\bjeans?\b|chambray|vaquer|cargo|sweatshirt|hoodie|\bfelpa|jogger|track ?pants?/i;
+export const registro = c => { const r = c.r ?? 2; return c.c === "jeans" || RX_CASUAL_SEMPRE.test(c.t) ? Math.min(r, 1) : r; };
 // stili che non vogliono capi sportivi, e quelli che chiedono almeno "curato" (Andrea 20/11: lusso italiano ≠ hip hop)
 const SENZA_SPORT = new Set(["Lusso", "Italiano", "Sera", "Parigino", "Minimal", "Maglieria", "Romantico", "Curvy"]);
 const CURATI = new Set(["Lusso", "Italiano", "Sera"]);
@@ -133,14 +136,21 @@ const COMUNI = ["Minimal", "Parigino", "Denim", "Colore", "Italiano", "Maglieria
 const affinita = (a, b) => a === b ? 2 : AFFINI[a]?.includes(b) ? 1 : -2;
 
 // ---------- stagione ----------
-const DA_CALDO = /halter|strapless|backless|bandeau|sandal|slide|adilette|slipper|pantofol|ciabatt|claquette|\bmules?\b|slingback|open.?toe|strappy|feather|espadrill|flip.?flop|tong\b|shorts?\b|bermuda|\blinen|\blin\b|\blino\b|crochet|raffia|sleeveless|sans manches|d[ée]bardeur|canott|\btank\b|\bcami\b|bandeau|bikini|mini ?short/i;
-const DA_FREDDO = /\bboots?\b|bottes?|bottines?|stival|\bwool|laine|\blana\b|cashmere|cachemire|puffer|piumin|doudoune|shearling|fleece|polaire|velvet|velours|turtleneck|col roul/i;
+const DA_CALDO = /hot ?pants?\b|hotpant|\bsummer\b|\bbeach\b|\bplage\b|\bplaya\b|\bsheer\b|\bvoile\b|\bgauze\b|hot ?pants|shorty|skort|\bthong\b|infradito|pantal[oó]n corto|pantaloncin|short pants|kurze hose|halter|strapless|backless|bandeau|sandal|slide|adilette|slipper|pantofol|ciabatt|claquette|\bmules?\b|slingback|open.?toe|strappy|feather|espadrill|flip.?flop|tong\b|shorts?\b|bermuda|\blinen|\blin\b|\blino\b|crochet|raffia|sleeveless|sans manches|d[ée]bardeur|canott|\btank\b|\bcami\b|bandeau|bikini|mini ?short/i;
+const DA_FREDDO = /\bbotas?\b|\bbotines?\b|sweater|jumper|maglion|turtleneck|col roul|\bpull\b|\bboots?\b|bottes?|bottines?|stival|\bwool|laine|\blana\b|cashmere|cachemire|puffer|piumin|doudoune|shearling|fleece|polaire|velvet|velours|turtleneck|col roul/i;
 /** Il capo è fuori stagione? `freddo` = si sta componendo per i mesi freddi. Vale solo per le proposte, non per la ricerca. */
 export const fuoriStagione = (capo, freddo) => (freddo ? DA_CALDO : DA_FREDDO).test(capo.t) ||
+  // pantaloni corti d'inverno anche se il nome non lo dice (hot pants, shorty, skort: il catalogo sa la lunghezza)
+  (!!freddo && capo.c === "pantaloni" && (capo.l === "corta" || /hot ?pants?|shorty|skort/i.test(capo.t))) ||
   // d'inverno un abito senza maniche o a maniche corte è da estate, salvo che sia di lana o velluto
   (!!freddo && capo.c === "abito" && (capo.w === "senza" || capo.w === "corte") && !["lana", "cashmere", "velluto"].includes(capo.f));
 
 // ---------- comporre ----------
+// una t-shirt dal titolo lungo è quasi sempre una maglietta con scritta ("Welcome to the Party … Tee")
+const maglietta_scritta = c => /\btee\b|t-?shirt/i.test(c.t) && c.t.split(/\s+/).length > 6;
+const RX_NON_BASE = /\bi love\b|\bcargo\b|boiler ?suit|track ?pants?|\blogo|graphic|slogan|\bprinted tee|\bsocks?\b|calzin|chaussette|\bthong|infradito|raffia|rafia|espadrill|tie[- ]?dye|\bvarsity|\bcollege\b|cartoon|mickey|disney|hello kitty|\bbandana/i;
+const RX_SPOSA = /bridal|\bbride\b|wedding (dress|gown)|abito da sposa|robe de mari[ée]e|vestido de novia/i;
+const RX_GILET_GIACCA = /gilet|\bvest\b|waistcoat|chaleco|smanicat|sleeveless/i;
 const PESO = { capospalla: 0.35, sopra: 0.20, sotto: 0.22, scarpe: 0.23, abito: 0.42 };
 
 /** Generatore casuale con seme, per avere outfit ripetibili nelle prove. */
@@ -175,6 +185,19 @@ export function punteggio(capo, scelti, ctx) {
     if (d !== null) p += (d < 18 ? 2 : d < 30 ? 1 : -3) * peso;
   }
   if (ctx.elegante) p += registro(capo) === 3 ? 2 : 0;               // per una sera si preferisce il capo più elegante
+  if (ctx.recenti?.has(chiave(capo))) p -= postoDi(capo) === "capospalla" || postoDi(capo) === "scarpe" ? 6 : 3;   // giacche e scarpe si notano di più                         // già visto negli ultimi look
+  // un solo protagonista (giro 4: giacca di jeans + gonna a stampa + sneakers verdi in un look parigino)
+  const fantasia = c => !!c.q && c.q !== "tinta unita";
+  if (fantasia(capo) && scelti.some(fantasia)) p -= 7;
+  // lo stile scelto si vede nei capi, non solo nel negozio (giro 4: Minimal con colori accesi, Denim senza denim)
+  if (profilo.stili?.includes("Minimal") && !profilo.stili.includes("Colore") && (tipo === "acceso" || fantasia(capo) || /lurex|metallic|sequin|paillette|tapestry|jacquard|glitter/i.test(capo.t))) p -= 9;
+  // senza stili scelti, i negozi di nicchia (rock, streetwear) passano in fondo
+  if (!profilo.stili?.length && ["Rock", "Streetwear"].includes(negozi[capo.n].stile)) p -= 4;
+  if (!profilo.stili?.length && registro(capo) === 0) p -= 3;                 // senza stili, i capi sportivi (track pants col logo) passano in fondo
+  if (profilo.stili?.includes("Denim") && postoDi(capo) !== "scarpe" && (capo.c === "jeans" || capo.f === "denim" || /\bdenim\b/i.test(capo.t)) && !scelti.some(c => c.c === "jeans" || c.f === "denim")) p += 4;
+  const denim = c => c.c === "jeans" || c.f === "denim" || /\bdenim\b|\bjean\b|vaquer|tejan|chambray/i.test(c.t);
+  if (denim(capo) && scelti.some(denim)) p -= 6;
+  if (postoDi(capo) === "scarpe" && profilo.stili?.length && profilo.stili.every(s => SENZA_SPORT.has(s)) && (capo.y === "sneakers" || /sneaker|trainer|baskets?\b|zapatilla/i.test(capo.t))) p -= 5;
   // eleganza: una felpa non va con un pantalone sartoriale (Andrea 20/11)
   for (const s of scelti) { const d = Math.abs(registro(s) - registro(capo)); p -= d >= 2 ? 6 : d * 0.8; }
   return p;
@@ -196,7 +219,21 @@ export function componi(capi, ctx, partenza = outfitVuoto(), bloccati = new Set(
   const per = { capospalla: [], sopra: [], sotto: [], scarpe: [], abito: [] };
   for (const c of capi) {
     const p = postoDi(c);
+    if (negozi[c.n].stile === "Rock" && !profilo.stili?.includes("Rock")) continue;   // goth/rock solo se scelto (giro 9: scarpe Killstar in "Ci sta bene con")
     if (!p || esclusi.has(chiave(c)) || !haTaglia(c, profilo) || fuoriStagione(c, profilo.freddo ?? profilo.conCapospalla)) continue;
+    if (!ctx.sposa && RX_SPOSA.test(c.t)) continue;
+    // buon senso sul prezzo: con un budget da 200 € in su niente capi da pochi euro accanto a capi da centinaia (giro 3: look "ufficio" con capi da 12 €)
+    if (profilo.budget >= 200 && c.e < profilo.budget * (ctx.elegante ? 0.08 : 0.06)) continue;   // per un look elegante la soglia sale
+    if (ctx.elegante && /rain ?boots?|rubber|wellington|wellies|gomma|caoutchouc|botas? de agua|gummistiefel/i.test(c.t)) continue;
+    // abbigliamento da pioggia e tecnico solo se lo si chiede (giro 5: Rains Dry Boot quasi sempre tra i suggeriti)
+    // capi "base" per gli stili curati: niente loghi, scritte, calzini, tie dye, zeppe di rafia (giro 6)
+    if ((ctx.elegante || (profilo.stili?.length && profilo.stili.every(s => SENZA_SPORT.has(s)))) && (RX_NON_BASE.test(c.t) || maglietta_scritta(c))) continue;
+    if (p === "sopra" && /bodysuit|\bbody\b/i.test(c.t)) continue;      // un body fotografato addosso sembra intimo: nei look no, in Scopri sì (giro 7)
+    if (/plasticana|adilette|pool ?slide|\bcrocs\b|zuecos?|\bclogs?\b/i.test(c.t)) continue;   // mai, nemmeno d'estate (giro 8)      // giro 6: zoccoli di plastica e ciabatte da piscina con un cappotto
+    // Minimal: tinta unita e niente lucido (giro 6: tapestry, "Rosewater Shine")
+    if (profilo.stili?.includes("Minimal") && !profilo.stili.includes("Colore") && p !== "scarpe" && (c.q || /shine|lurex|metallic|sequin|paillette|tapestry|jacquard|glitter/i.test(c.t))) continue;
+    if (!ctx.pioggia && /\brain ?(coat|jacket|pants|boots?)\b|rainboot|dry boot|\bwaders?\b|\bski\b|soft ?shell/i.test(c.t)) continue;                                   // l'abito da sposa solo se lo si chiede (giro 2: bridal gown nei look di tutti i giorni)
+    if (p === "capospalla" && (profilo.freddo ?? profilo.conCapospalla) && RX_GILET_GIACCA.test(c.t)) continue;   // d'inverno un gilet non fa da giacca
     if (profilo.genere === "u" && (p === "abito" || c.c === "gonna")) continue;
     per[p].push(c);
   }
@@ -215,7 +252,9 @@ export function componi(capi, ctx, partenza = outfitVuoto(), bloccati = new Set(
   const corpoBloccato = o.abito || o.sopra || o.sotto;
   // l'abito si propone solo se ci sta nel budget insieme alle scarpe: se no si ragiona a sopra + sotto
   const abitoCiSta = minimo("abito") + (o.scarpe ? 0 : minimo("scarpe")) <= profilo.budget - totale(o);
-  const usaAbito = !corpoBloccato && profilo.genere !== "u" && abitoCiSta && rnd() < 0.3;
+  // l'abito chiesto (stylist) o l'unica scelta possibile si usa sempre; se no 3 volte su 10 (collaudo 25/11: "vestito rosso" diventava altro)
+  const soloAbito = per.abito.length && (!per.sopra.length || !per.sotto.length);
+  const usaAbito = !corpoBloccato && profilo.genere !== "u" && (ctx.vuoleAbito || soloAbito || (abitoCiSta && rnd() < 0.3));
   if (o.abito) { /* abito bloccato: niente sopra/sotto */ }
   else if (usaAbito) daFare.push("abito");
   else { if (!o.sopra) daFare.push("sopra"); if (!o.sotto) daFare.push("sotto"); }
@@ -232,13 +271,14 @@ export function componi(capi, ctx, partenza = outfitVuoto(), bloccati = new Set(
   daFare.forEach((posto, i) => {
     const dopo = daFare.slice(i + 1);
     // il capospalla è facoltativo: non deve togliere soldi ai posti obbligatori
-    const riserva = dopo.filter(p => p !== "capospalla").reduce((t, p) => t + minimo(p), 0);
+    // il capospalla di solito è facoltativo e non toglie soldi agli altri; se è stato chiesto (obbligaGiacca) gli si tiene il posto (giro 8)
+    const riserva = dopo.filter(p => p !== "capospalla" || profilo.obbligaGiacca).reduce((t, p) => t + minimo(p), 0);
     const tetto = resto - (Number.isFinite(riserva) ? riserva : 0);
     const pesi = [posto, ...dopo].reduce((t, p) => t + PESO[p], 0);
     const obiettivo = Math.max(minimo(posto), resto * PESO[posto] / pesi);
     const scelti = capiDi(o);
     let cand = per[posto].filter(c => c.e <= tetto);
-    if (!cand.length) { if (posto !== "capospalla") manca.push({ posto, daEuro: minimo(posto) }); return; }
+    if (!cand.length) { if (posto !== "capospalla" || profilo.obbligaGiacca) manca.push({ posto, daEuro: minimo(posto) }); return; }
     // stile e colori sono vincoli, non suggerimenti: si allarga solo se nel budget non resta niente (e lo si dice)
     // la palette conta più del negozio (Andrea 20/11: "solo cose che vanno bene con l'armocromia")
     const gradi = [
@@ -284,7 +324,11 @@ export function alternative(capi, ctx, outfit, posto, entro) {
   const stileGuida = altri.length ? ctx.negozi[altri[0].n].stile : profilo.stili?.[0];
   const c2 = { ...ctx, stileGuida };
   return capi
-    .filter(c => postoDi(c) === posto && !esclusi.has(chiave(c)) && haTaglia(c, profilo) && !(profilo.genere === "u" && c.c === "gonna"))
+    .filter(c => postoDi(c) === posto && !esclusi.has(chiave(c)) && haTaglia(c, profilo) && !(profilo.genere === "u" && c.c === "gonna")
+      && !(posto === "capospalla" && (profilo.freddo ?? profilo.conCapospalla) && RX_GILET_GIACCA.test(c.t))
+      && !(profilo.budget >= 200 && c.e < profilo.budget * 0.06) && !RX_SPOSA.test(c.t)
+      && !/\brain ?(coat|jacket|pants|boots?)\b|rainboot|dry boot|\bwaders?\b|\bski\b|soft ?shell|plasticana|adilette|pool ?slide|\bcrocs\b|zuecos?|\bclogs?\b/i.test(c.t)
+      && !((profilo.stili?.length && profilo.stili.every(s => SENZA_SPORT.has(s))) && RX_NON_BASE.test(c.t)))
     .map(c => [punteggio(c, altri, c2) - (c.e > entro ? 100 : 0) - (fuoriStagione(c, profilo.freddo ?? profilo.conCapospalla) ? 4 : 0)
       - (nelloStile(c, profilo.stili, ctx.negozi, false) ? 0 : 8) - (inPalette(c, profilo.stagione, posto) ? 0 : 4), c])
     .sort((a, b) => b[0] - a[0] || a[1].e - b[1].e)
@@ -365,11 +409,14 @@ export const SOTTOCATEGORIE = {
   capospalla: [["blazer", "Blazer", c => /blazer/i.test(c.t)], ["gilet", "Gilet e smanicati", c => RX_GILET.test(c.t)], ["piumini", "Piumini", c => /puffer|padded|down jacket|piumin|doudoune/i.test(c.t)],
     ["trench", "Trench", c => /trench/i.test(c.t)], ["cappotti", "Cappotti", c => /coat|manteau|cappott|abrigo|parka/i.test(c.t)],
     ["giacche", "Giacche", () => true]],
-  abito: [["mini", "Corti", c => c.l === "corta" || /\bmini\b/i.test(c.t)], ["lunghi", "Lunghi", c => c.l === "lunga" || /maxi|long dress|\blong\b/i.test(c.t)], ["altri", "Altri abiti", () => true]],
-  scarpe: [["decollete", "Décolleté", c => c.y === "décolleté"], ["stivali", "Stivali", c => c.y === "stivali"], ["stivaletti", "Stivaletti", c => c.y === "stivaletti"],
-    ["sneakers", "Sneakers", c => c.y === "sneakers"], ["mocassini", "Mocassini", c => c.y === "mocassini"], ["ballerine", "Ballerine", c => c.y === "ballerine"],
+  abito: [["sera", "Da sera", c => registro(c) === 3], ["mini", "Corti", c => c.l === "corta" || /\bmini\b/i.test(c.t)], ["midi", "Midi", c => c.l === "media" || /\bmidi\b/i.test(c.t)],
+    ["lunghi", "Lunghi", c => c.l === "lunga" || /maxi|long dress|\blong\b/i.test(c.t)], ["altri", "Altri abiti", () => true]],
+  scarpe: [["decollete", "Décolleté", c => c.y === "décolleté" && !/ballerin|ballet|\bflats?\b|mocassin|loafer/i.test(c.t)], ["stivali", "Stivali", c => c.y === "stivali"], ["stivaletti", "Stivaletti", c => c.y === "stivaletti"],
+    ["sneakers", "Sneakers", c => c.y === "sneakers"], ["mocassini", "Mocassini", c => c.y === "mocassini"], ["ballerine", "Ballerine", c => c.y === "ballerine" || /ballerin|ballet/i.test(c.t)],
     ["sandali", "Sandali e mules", c => c.y === "sandali" || c.y === "mules"], ["altre", "Altre", () => true]],
 };
+/** Il nome del posto per l'etichetta: una tuta non è un abito (giro 7). */
+export const nomeCapo = (c, p = postoDi(c)) => p === "abito" && /jumpsuit|playsuit|romper|overall|\btuta\b|combinaison|\bmono\b|boiler ?suit/i.test(c.t) ? "Tuta" : NOME_POSTO[p];
 /** La sottocategoria di un capo nel suo reparto. */
 export function sottoDi(capo, posto = postoDi(capo)) {
   const l = SOTTOCATEGORIE[posto]; if (!l) return null;

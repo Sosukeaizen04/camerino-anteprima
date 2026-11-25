@@ -30,7 +30,7 @@ RX_BAMBINI = re.compile(r"^\s*(?:girls?|kids?|toddlers?)\b", re.I)   # "Boy Henl
 RX_FUORI = re.compile(r"\b(bag|bags|borsa|sac|bolso|tote|clutch|pouch|belt|ceinture|cintura|earring|necklace|bracelet|ring|jewel|bijou|"
                       r"scarf|sciarpa|foulard|echarpe|hat|cap|beanie|bonnet|sock|socks|chaussette|calz|gift|card|candle|sunglass|lunette|"
                       r"keyring|charm|hair|swim|bikini|maillot|underwear|lingerie|bra\b|brief|culotte|perfume|parfum|towel|mask|glove|gant|"
-                      r"blanket|leg ?warmers?|arm ?warmers?|scaldamuscoli|gaiters?|snood|scaldacollo|neck ?warmer|\bcombs?\b|hairbrush|spazzola|skullcap|balaclava|patron de couture|sewing pattern|knitting pattern|crochet pattern|\bclasp\b|\bpdf\b|cartamodell|guantes?|gloves?|mittens?|keychain|key ?ring|headband|head ?scarf|bandana|beret|scrunchie|hair ?clip|bucket hat|llavero|\bthrow\b|kids?\b|baby|bebe|enfant|toddler|infant|pj\b|pyjama|pajama|sleep|robe de chambre|little (?:girls?|boys?)|big girls?|mini ?me\b|mommy and me|pant(?:y|ies)\b|knickers|boxers?\b|boxer shorts?|gift card|final sale item|laces?|insoles?|shoe care)")
+                      r"blanket|leg ?warmers?|arm ?warmers?|scaldamuscoli|gaiters?|snood|scaldacollo|neck ?warmer|\bcombs?\b|hairbrush|spazzola|skullcap|balaclava|patron de couture|sewing pattern|knitting pattern|crochet pattern|\bclasp\b|\bpdf\b|cartamodell|guantes?|gloves?|mittens?|keychain|key ?ring|headband|head ?scarf|bandana|beret|scrunchie|hair ?clip|bucket hat|llavero|\bthrow\b|kids?\b|baby|bebe|enfant|toddler|infant|pj\b|pyjama|pajama|pijama|pigiama|loungewear|sleep|robe de chambre|little (?:girls?|boys?)|bath ?robe|bathrobe|peignoir|accappatoio|albornoz|bademantel|cushion|pillow ?cases?|pillowcase|throw pillow|coussin|kissen|cuscin|coj[ií]n|m[üu]tze|strickm[üu]tze|gorro|dog coat|dog sweater|pet \w+ sweater|\bpet\b|\bdog\b|per cani|cappellin|(?:silk|knit|knitted|wool|satin|cashmere) ties?\b|necktie|krawatte|cravatt|corbata|\d ?-?pack\b|pack of \d|set of \d|confezione da|big girls?|mini ?me\b|mommy and me|pant(?:y|ies)\b|\bslip\b(?! ?(?:dress|skirt|abito|gonna|robe))|\bhipster\b(?! ?(?:jeans?|trousers?|pants?|skirt|flare|denim))|knickers|boxers?\b|boxer shorts?|gift card|final sale item|laces?|insoles?|shoe care)")
 
 NUMERI_SCARPE = list(range(35, 48))  # taglie europee 35–47
 
@@ -59,11 +59,12 @@ def genere(p, dominio, misto):
 PRIMA = [
     ("abito", r"\bdress(es)?\b|(mini|midi|maxi)dress|shirt ?dress|\bjumpsuit|\bplaysuit|\bgown\b"),
     ("top", r"\bvest top|\btank top|\bcami top"),
+    ("maglia", r"sweater ?vest|knit(ted)? vest|jersey vest|pointelle vest|pullunder|strickpullunder|slipover"),
     # la parola del capo vince sul tessuto ("pantalone in gabardina" non è un trench) e su "knit"
     ("gonna", r"\bskirts?\b|\bskorts?\b|\bjupe\b|\bgonna\b|\bfalda\b|\bminigonna"),
     ("pantaloni", r"\bpantal[oó]n|\bpantalone|\btrousers?\b"),
     ("pantaloni", r"sweat ?pants?|track ?pants?|\bjoggers?\b|\bleggings?\b|\bchándal\b"),
-    ("capospalla", r"overshirt|shacket|\bcazadora|\bgabardina|\babrigo|\bchaleco|\bparka"),
+    ("capospalla", r"waistcoat|overshirt|shacket|\bcazadora|\bgabardina|\babrigo|\bchaleco|\bparka"),
     ("maglia", r"\bsudadera|\bjers[eé]is?\b|\bc[aá]rdigan|\bsu[eé]ter|\bstrick|\bpulli"),
     ("top", r"\bcamiseta|\bt-?shirts?\b|\bt shirts?\b|\btshirts?\b|long ?sleeve tee|baby tee"),
     ("jeans", r"\bvaqueros?\b"),
@@ -151,13 +152,13 @@ def maniche(p, cat):
     titolo = f"{p['title']} {p['handle'].replace('-', ' ')}".lower()
     corpo = re.sub(r"<[^>]+>", " ", p.get("body_html") or "").lower()
     for t in (titolo, corpo):
-        if re.search(r"sleeveless|strapless|halter|\btank\b|\bcami\b|camisole|spaghetti|smanicat|senza maniche|sans manches|d[ée]bardeur|canott|\bvest top", t):
+        if re.search(r"sleeveless|strapless|halter|\btank\b|\bcami\b|camisole|spaghetti|smanicat|senza maniche|sans manches|sin mangas|[äa]rmellos|d[ée]bardeur|canott|\bvest top", t):
             return "senza"
         if re.search(r"3/4|three[- ]quarter|elbow[- ]length|manches? 3/4", t):
             return "3/4"
-        if re.search(r"short[- ]sleeve|\bs/s\b|manches? courtes|maniche corte|manica corta|cap sleeve|t-?shirt|\btee\b|polo", t):
+        if re.search(r"short[- ]sleeve|\bs/s\b|manches? courtes|maniche corte|manica corta|manga corta|mangas cortas|kurzarm|cap sleeve|t-?shirt|\btee\b|polo", t):
             return "corte"
-        if re.search(r"long[- ]sleeve|\bl/s\b|manches? longues|maniche lunghe|manica lunga|long sleeves", t):
+        if re.search(r"long[- ]sleeve|\bl/s\b|manches? longues|maniche lunghe|manica lunga|manga larga|mangas largas|langarm|long sleeves", t):
             return "lunghe"
     if cat in ("maglia", "capospalla"):
         return "lunghe"     # maglioni, cardigan e giacche: quando le maniche sono corte il negozio lo scrive

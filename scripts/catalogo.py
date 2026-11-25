@@ -86,7 +86,7 @@ CATEGORIE = [
            r"swim|bikini|maillot|underwear|lingerie|bra\b|brief|culotte|perfume|parfum|towel|mask|glove|gant|kids?\b|baby|bebe|enfant|"
            r"(?<!wo)men\b|(?<!wo)men's|homme|uomo|pj\b|pyjama|pajama|sleep|robe de chambre|gift card|final sale item)"),
     ("abito", r"\b(dress|dresses|robe|abito|vestido|jumpsuit|combinaison|tuta|playsuit|gown)"),
-    ("capospalla", r"\b(coat|jacket|blazer|trench|bomber|parka|puffer|gilet|vest\b|manteau|veste|blouson|doudoune|cappotto|giacca|giubbotto|"
+    ("capospalla", r"\b(coats?\b|overcoat|jacket|blazer|trench|bomber|parka|puffer|gilet|vest\b|manteau|veste|blouson|doudoune|cappotto|giacca|giubbotto|"
                    r"piumino|abrigo|chaqueta|outerwear|windbreaker|anorak|cape\b)"),
     ("maglia", r"\b(sweater|jumper|knit|cardigan|pullover|pull\b|sweat|hoodie|maglion|maglia|cardi|punto|turtleneck|crewneck)"),
     ("top", r"(t-shirt|tee-shirt|\btee\b|\btank\b|\bpolo\b|\bcami\b|bodysuit)"),

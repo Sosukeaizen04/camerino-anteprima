@@ -204,24 +204,40 @@ const MATERIALI = ["cashmere", "lana", "seta", "lino", "pelle", "denim", "vellut
 const SISTEMA_STYLIST = `You are the stylist of Camerino, a fashion app that builds complete outfits from real products of online shops.
 The user writes what they want. Turn it into a request the app can search. You never name products or shops: the app picks real ones.
 Answer ONLY with JSON, no markdown:
-{"risposta": string, "lingua": "it"|"en"|"de"|"fr"|"es"|string, "budget": number|null, "stili": string[], "elegante": boolean, "giacca": boolean|null, "abito": boolean|null,
+{"tipo": "look"|"chiacchiera"|"domanda", "risposta": string, "lingua": "it"|"en"|"de"|"fr"|"es"|string, "budget": number|null, "stili": string[], "elegante": boolean, "giacca": boolean|null, "caldo": boolean|null, "abito": boolean|null,
  "sopra": {"tipo": "maglia"|"camicia"|"top"|null, "colori": string[], "materiale": string|null, "maniche": "senza"|"corte"|"3/4"|"lunghe"|null} | null,
  "sotto": {"tipo": "pantaloni"|"jeans"|"gonna"|null, "colori": string[], "materiale": string|null, "lunghezza": "corta"|"normale"|"lunga"|null} | null,
  "abito_dettagli": {"colori": string[], "materiale": string|null, "lunghezza": "corta"|"normale"|"lunga"|null, "maniche": "senza"|"corte"|"3/4"|"lunghe"|null} | null,
  "scarpe": {"tipo": "stivali"|"sneakers"|"tacchi"|"sandali"|"mocassini"|"ballerine"|null, "colori": string[]} | null,
  "giacca_dettagli": {"tipo": "cappotto"|"giacca"|"blazer"|"piumino"|"trench"|null, "colori": string[], "materiale": string|null} | null}
 Rules:
-- "risposta": one or two short friendly sentences in the language required below, saying what you are putting together (no product names, no prices you can't know). If the request is not about clothes, say kindly what you can do.
+- "tipo": "look" when the user asks for an outfit or wants to change the current one (also short follow-ups like "più elegante", "cheaper", "altro colore");
+  "chiacchiera" for thanks, greetings, ok, compliments (then "risposta" is one short friendly sentence and no outfit is built);
+  also "chiacchiera" when the request cannot be done with real clothes from shops: a total budget under 30 euro, costumes or non-clothing ("tuta spaziale per Marte"), things that aren't fashion: then "risposta" says kindly why and suggests what you can do;
+  "domanda" for a style question that needs no new outfit ("what shoes go with burgundy?", "si può mettere il nero col blu?"): then "risposta" answers it in 2–3 plain sentences, general advice only, no product names, no invented facts.
+- "risposta": for "look", one or two short friendly sentences in the language required below, saying what you are putting together (no product names, no prices you can't know). If the request is not about clothes, say kindly what you can do.
 - "lingua": the language the user wrote this message in (ISO code). "risposta" is in that language.
 - "budget": total euros for the whole outfit only if the user writes an amount or says cheap/expensive in THIS or the previous request; otherwise null (do not copy the current budget).
 - "stili": zero to two of ${JSON.stringify(STILI)} that fit the request (office → Minimal/Italiano, evening/party → Sera, sport → Sportivo, etc.).
 - "elegante": true for dinners, evenings, ceremonies, office/work, dates, theatre: then also choose a fitting "tipo" for each piece (e.g. camicia or maglia, pantaloni or gonna, tacchi or stivali or mocassini).
 - colours only from ${JSON.stringify(COLORI)}; materials only from ${JSON.stringify(MATERIALI)}. Leave a field null or [] if the user doesn't ask; do not over-constrain.
+- "caldo": true if the user asks for summer/hot weather/beach/holiday in a warm place, false if winter/snow/cold, else null.
+- A "completo"/suit means "giacca": true with "giacca_dettagli.tipo": "blazer" and matching trousers (or skirt).
 - "giacca": true if a coat/jacket is wanted or the weather is cold, false if explicitly not, else null. "abito": true if a dress is wanted (women only), false if trousers/skirt are wanted, else null.
-- If the user only changes one thing ("make it cheaper", "darker shoes"), keep the rest of the previous request.`;
+- Colours: only the colours the user actually writes (in this message or, for a short follow-up, in the previous request). Never add colours of your own.
+- Use the previous request ONLY when this message is a short follow-up that changes one thing ("make it cheaper", "darker shoes", "più elegante"). A new full request (a new occasion or a new list of pieces) starts from scratch: do not carry over pieces, colours or budget.`;
+
+/** Italiano o inglese dal testo (parole frequenti): decide la lingua della risposta, non il modello (giro 1: lingue mescolate). */
+const PAROLE_IT = /\b(il|lo|la|le|gli|un|una|uno|per|con|che|di|da|sotto|voglio|vorrei|cerco|qualcosa|più|meno|nero|nera|bianco|scarpe|camicia|pantaloni|giacca|cappotto|abito|vestito|grazie|ciao|elegante|cena|ufficio|matrimonio)\b/gi;
+const PAROLE_EN = /\b(the|a|an|for|with|under|i|want|need|something|more|less|black|white|shoes|shirt|trousers|pants|jacket|coat|dress|thanks|thank|hi|elegant|dinner|office|wedding|outfit|look)\b/gi;
+function linguaDi(t) {
+  const it = (t.match(PAROLE_IT) || []).length, en = (t.match(PAROLE_EN) || []).length;
+  return it > en ? "it" : en > it ? "en" : null;
+}
 
 async function chiediStylist(env, testo, genere, budget, lingua, storia) {
-  const contesto = `User: ${genere === "u" ? "man" : "woman"}. Current outfit budget: ${budget} euro. The app is set to ${lingua === "en" ? "English" : "Italian"}: write "risposta" in the language of the user's message.` +
+  const lingTesto = linguaDi(testo) || lingua;
+  const contesto = `User: ${genere === "u" ? "man" : "woman"}. Current outfit budget: ${budget} euro. Write "risposta" in ${lingTesto === "en" ? "English" : lingTesto === "it" ? "Italian" : "the language of the user's message"} and set "lingua" accordingly.` +
     (storia ? `\nPrevious request (JSON): ${JSON.stringify(storia).slice(0, 1500)}` : "");
   let r;
   try {
@@ -235,16 +251,25 @@ async function chiediStylist(env, testo, genere, budget, lingua, storia) {
   try { j = JSON.parse(testoOut.slice(testoOut.indexOf("{"), testoOut.lastIndexOf("}") + 1)); } catch { return { errore: "capire" }; }
   // si tiene solo ciò che l'app conosce
   const lista = (v, ammessi) => Array.isArray(v) ? v.filter(x => ammessi.includes(x)).slice(0, 3) : [];
+  // i colori valgono solo se la persona li ha scritti (il modello ne aggiungeva di suoi: collaudo 25/11)
+  const detti = (testo + " " + (storia ? JSON.stringify(storia) : "")).toLowerCase();
+  const PAROLE_COLORE = { nero: /ner[oaie]|black/, bianco: /bianc|white/, panna: /panna|cream|ivory|avorio/, beige: /beige/, cammello: /cammello|camel/, marrone: /marron|brown|cioccolat/, grigio: /grig|gr[ae]y/,
+    blu: /\bblu\b|blue/, navy: /navy|blu scuro/, azzurro: /azzurr|light blue|celeste/, verde: /verd|green/, oliva: /oliva|olive/, rosso: /ross|red\b/, bordeaux: /bordeaux|burgundy|vinaccia/, rosa: /\brosa\b|pink/,
+    arancione: /arancion|orange/, giallo: /giall|yellow/, viola: /viola|purple/, lilla: /lilla|lilac/ };
+  const scuro = /scur|dark/.test(testo.toLowerCase());
+  const coloriDetti = v => lista(v, COLORI).filter(c => PAROLE_COLORE[c]?.test(detti) || (scuro && ["nero", "navy", "marrone", "grigio", "bordeaux"].includes(c)));
   const una = (v, ammessi) => ammessi.includes(v) ? v : null;
-  const pezzo = (o, campi) => o && typeof o === "object" ? Object.fromEntries(Object.entries(campi).map(([k, amm]) => [k, k === "colori" ? lista(o[k], COLORI) : una(o[k], amm)])) : null;
+  const pezzo = (o, campi) => o && typeof o === "object" ? Object.fromEntries(Object.entries(campi).map(([k, amm]) => [k, k === "colori" ? coloriDetti(o[k]) : una(o[k], amm)])) : null;
   const MAN = ["senza", "corte", "3/4", "lunghe"], LUN = ["corta", "normale", "lunga"];
   return {
-    risposta: String(j.risposta || "").slice(0, 400),
-    lingua: /^[a-z]{2}$/.test(j.lingua) ? j.lingua : lingua,
+    tipo: ["look", "chiacchiera", "domanda"].includes(j.tipo) ? j.tipo : "look",
+    tuta: /\btuta\b|jumpsuit|playsuit|romper|salopette|overall|combinaison/i.test(testo),
+    risposta: String(j.risposta || "").slice(0, 600),
+    lingua: linguaDi(testo) || (/^[a-z]{2}$/.test(j.lingua) ? j.lingua : lingua),
     richiesta: {
       // il modello a volte copia il budget del profilo anche se non lo si è chiesto (24/11): vale solo con una cifra nel testo o nella richiesta precedente
       budget: Number.isFinite(+j.budget) && +j.budget >= 30 && +j.budget <= 20000 && (/\d|econom|cheap|costos|car[oa]|expensive|risparm|budget|spend|spender/i.test(testo) || storia?.budget) ? Math.round(+j.budget) : null,
-      stili: lista(j.stili, STILI).slice(0, 2), elegante: j.elegante === true, giacca: typeof j.giacca === "boolean" ? j.giacca : null, abito: genere === "d" && typeof j.abito === "boolean" ? j.abito : genere === "u" ? false : null,
+      stili: lista(j.stili, STILI).slice(0, 2), elegante: j.elegante === true, giacca: typeof j.giacca === "boolean" ? j.giacca : null, caldo: typeof j.caldo === "boolean" ? j.caldo : null, abito: genere === "d" && typeof j.abito === "boolean" ? j.abito : genere === "u" ? false : null,
       sopra: pezzo(j.sopra, { tipo: ["maglia", "camicia", "top"], colori: 0, materiale: MATERIALI, maniche: MAN }),
       sotto: pezzo(j.sotto, { tipo: ["pantaloni", "jeans", "gonna"], colori: 0, materiale: MATERIALI, lunghezza: LUN }),
       abito: null,
